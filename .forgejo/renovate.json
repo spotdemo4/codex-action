@@ -1,0 +1,52 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-global-schema.json",
+
+  // self-hosted
+  "onboarding": false,
+  "requireConfig": "ignored",
+  "platform": "forgejo",
+  "endpoint": "https://trev.zip/api/v1",
+  "repositories": ["template/node"],
+  "allowedCommands": ["npm audit fix"],
+
+  // repository
+  "extends": ["config:recommended"],
+  "addLabels": ["dep"],
+  "nix": {
+    "enabled": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": ["* * * * 0"], // sunday
+    "skipInstalls": false,
+    "postUpgradeTasks": {
+      "commands": ["npm audit fix"]
+    }
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "matchManagers": ["nix"],
+      "addLabels": ["nix"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "addLabels": ["actions"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "rangeStrategy": "bump",
+      "addLabels": ["node"],
+      "postUpdateOptions": ["npmInstallTwice"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["engines"],
+      "enabled": false
+    }
+  ]
+}

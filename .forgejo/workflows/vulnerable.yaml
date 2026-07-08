@@ -1,0 +1,54 @@
+name: vulnerable
+
+on:
+  schedule:
+    - cron: "0 9 * * 0" # every Sunday at 09:00 UTC
+  workflow_dispatch:
+
+# yaml-language-server-disable is not allowed
+enable-openid-connect: true
+
+jobs:
+  npm:
+    # zizmor: ignore[excessive-permissions]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Initialize
+        uses: spotdemo4/nix-init@1443d93dfa3ca2f043b37f848631d6ac5563b0ec # v1.56.0
+        with:
+          github_token: ${{ secrets.GH_TOKEN }}
+          niks3_url: https://niks3.trev.zip
+          shell: vulnerable
+
+      - name: Run npm audit
+        run: npm audit --audit-level moderate
+
+  nix:
+    # zizmor: ignore[excessive-permissions]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Initialize
+        uses: spotdemo4/nix-init@1443d93dfa3ca2f043b37f848631d6ac5563b0ec # v1.56.0
+        with:
+          github_token: ${{ secrets.GH_TOKEN }}
+          niks3_url: https://niks3.trev.zip
+          shell: vulnerable
+
+      - name: Run flake-checker
+        run: flake-checker -f
+
+  actions:
+    # zizmor: ignore[excessive-permissions]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Initialize
+        uses: spotdemo4/nix-init@1443d93dfa3ca2f043b37f848631d6ac5563b0ec # v1.56.0
+        with:
+          github_token: ${{ secrets.GH_TOKEN }}
+          niks3_url: https://niks3.trev.zip
+          shell: vulnerable
+
+      - name: Run zizmor
+        run: zizmor $(find .forgejo/workflows -name "*.yaml")
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}

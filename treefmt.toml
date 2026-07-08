@@ -1,0 +1,10 @@
+#:schema https://www.schemastore.org/treefmt.json
+
+[formatter.oxfmt]
+command = "oxfmt"
+options = ["--write"]
+includes = ["*.ts", "*.tsx", "*.html", "*.css", "*.json", "*.yaml", "*.toml", "*.md"]
+
+[formatter.nixfmt]
+command = "nixfmt"
+includes = ["*.nix"]

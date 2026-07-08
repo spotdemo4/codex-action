@@ -1,0 +1,16 @@
+/.env
+/.envrc
+/docker-compose*
+
+# agents
+.agents/
+.claude/
+.codex/
+
+# nix
+/result*
+/.direnv/
+
+# node
+/node_modules/
+/build/

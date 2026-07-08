@@ -1,0 +1,49 @@
+name: vulnerable
+
+on:
+  schedule:
+    - cron: "0 9 * * 0" # every Sunday at 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nix:
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - name: Initialize
+        uses: spotdemo4/nix-init@1443d93dfa3ca2f043b37f848631d6ac5563b0ec # v1.56.0
+        with:
+          shell: vulnerable
+
+      - name: Run flake-checker
+        run: flake-checker -f
+
+  actions:
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - name: Initialize
+        uses: spotdemo4/nix-init@1443d93dfa3ca2f043b37f848631d6ac5563b0ec # v1.56.0
+        with:
+          shell: vulnerable
+
+      - name: Run zizmor
+        run: zizmor .github
+
+  npm:
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - name: Initialize
+        uses: spotdemo4/nix-init@1443d93dfa3ca2f043b37f848631d6ac5563b0ec # v1.56.0
+        with:
+          shell: vulnerable
+
+      - name: Run npm audit
+        run: npm audit --audit-level moderate
