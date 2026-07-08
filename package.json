@@ -1,13 +1,13 @@
 {
-  "name": "node-template",
-  "version": "0.6.17",
-  "description": "node.js template",
+  "name": "codex-action",
+  "version": "0.0.1",
+  "description": "use codex in a GitHub/Gitea/Forgejo action",
   "license": "MIT",
   "repository": {
-    "url": "https://trev.zip/template/node"
+    "url": "https://trev.zip/llc/codex-action"
   },
   "bin": {
-    "node-template": "build/index.js"
+    "codex-action": "build/index.js"
   },
   "type": "module",
   "scripts": {

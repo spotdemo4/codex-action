@@ -6,7 +6,7 @@
   "requireConfig": "ignored",
   "platform": "forgejo",
   "endpoint": "https://trev.zip/api/v1",
-  "repositories": ["template/node"],
+  "repositories": ["llc/codex-action"],
   "allowedCommands": ["npm audit fix"],
 
   // repository

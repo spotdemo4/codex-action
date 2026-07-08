@@ -1,7 +1,7 @@
-name: node template
-description: a template for node projects
+name: codex action
+description: use codex in a GitHub/Gitea/Forgejo action
 author: trev
 
 runs:
   using: node24
-  main: src/index.ts
+  main: build/index.js

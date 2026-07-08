@@ -1,5 +1,5 @@
 {
-  description = "node.js template";
+  description = "use codex in a GitHub/Gitea/Forgejo action";
 
   nixConfig = {
     extra-substituters = [
@@ -90,8 +90,8 @@
         packages = {
           default = pkgs.buildNpmPackage (
             final: with pkgs.lib; {
-              pname = "node-template";
-              version = "0.6.17";
+              pname = "codex-action";
+              version = "0.0.1";
 
               src = fileset.toSource {
                 root = ./.;
@@ -124,14 +124,14 @@
               '';
 
               meta = {
-                mainProgram = "node-template";
-                description = "node.js template";
+                mainProgram = "codex-action";
+                description = "use codex in a GitHub/Gitea/Forgejo action";
                 license = licenses.mit;
                 platforms = platforms.all;
                 badPlatforms = [ systems.inspect.platformPatterns.isStatic ];
-                homepage = "https://trev.zip/template/node";
-                changelog = "https://trev.zip/template/node/releases";
-                downloadPage = "https://trev.zip/template/node/releases/tag/v${final.version}";
+                homepage = "https://trev.zip/llc/codex-action";
+                changelog = "https://trev.zip/llc/codex-action/releases";
+                downloadPage = "https://trev.zip/llc/codex-action/releases/tag/v${final.version}";
               };
             }
           );
@@ -219,18 +219,7 @@
             '';
           };
 
-          renovate-gh = {
-            root = ./.github;
-            files = ./.github/renovate.json;
-            packages = with pkgs; [
-              renovate
-            ];
-            script = ''
-              renovate-config-validator renovate.json
-            '';
-          };
-
-          renovate-fj = {
+          renovate = {
             root = ./.forgejo;
             files = ./.forgejo/renovate.json;
             packages = with pkgs; [
