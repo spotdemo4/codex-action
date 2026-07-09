@@ -636,8 +636,7 @@ function formatCodexFileChangeItem(item: Record<string, unknown>): string {
         .join(", ")
     : "";
   const suffix = changes ? `: ${changes}` : "";
-  const failureDetails = item.status === "failed" ? formatCodexFailureDetails(item) : "";
-  return `file_change ${getString(item, "status") ?? "unknown"}${suffix}${failureDetails}`;
+  return `file_change ${getString(item, "status") ?? "unknown"}${suffix}`;
 }
 
 function formatCodexCommandExecutionItem(item: Record<string, unknown>): string {
@@ -657,22 +656,6 @@ function formatCodexMcpToolCallItem(item: Record<string, unknown>): string {
   const errorSuffix = error ? `: ${error}` : "";
 
   return `mcp_tool_call ${getString(item, "status") ?? "unknown"}: ${server}/${tool}${errorSuffix}`;
-}
-
-function formatCodexFailureDetails(item: Record<string, unknown>): string {
-  const message = getString(item, "message") ?? getString(item, "reason");
-
-  if (message) {
-    return `: ${truncateLogText(message)}`;
-  }
-
-  if (isRecord(item.error)) {
-    const errorMessage = getString(item.error, "message") ?? JSON.stringify(item.error);
-    return errorMessage ? `: ${truncateLogText(errorMessage)}` : "";
-  }
-
-  const json = JSON.stringify(item);
-  return json ? `: ${truncateLogText(json)}` : "";
 }
 
 function formatCodexTodoListItem(item: Record<string, unknown>): string {
