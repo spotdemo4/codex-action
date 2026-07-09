@@ -39,5 +39,5 @@ jobs:
         uses: ./. # zizmor: ignore[unpinned-uses]
         with:
           auth: ${{ secrets.CODEX_ACTION_AUTH }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.CODEX_TOKEN }}
           prompt: Hello
