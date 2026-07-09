@@ -54,17 +54,17 @@ export async function run(): Promise<void> {
       await commitChanges(workspace, metadata.commitMessage);
 
       if (inputs.dryRun) {
-        core.info("Dry run enabled; skipping push of Codex changes.");
+        core.info("Dry run enabled; skipping push of Codex changes");
       } else {
         await pushChanges(workspace, platformClient.type, user, platformClient.token);
       }
     } else {
-      core.info("Codex did not leave repository changes to commit.");
+      core.info("Codex did not leave repository changes to commit");
     }
 
     if (pullRequestEvent && prComment) {
       if (inputs.dryRun) {
-        core.info("Dry run enabled; skipping Codex pull request comment.");
+        core.info("Dry run enabled; skipping Codex pull request comment");
       } else {
         await platformClient.postPullRequestComment(prComment);
       }
@@ -72,7 +72,7 @@ export async function run(): Promise<void> {
 
     if (pullRequestEvent && inputs.automerge !== undefined) {
       if (inputs.dryRun) {
-        core.info("Dry run enabled; skipping pull request automerge update.");
+        core.info("Dry run enabled; skipping pull request automerge update");
       } else {
         await platformClient.setPullRequestAutomerge(inputs.automerge);
       }

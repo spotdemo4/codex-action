@@ -88,7 +88,7 @@ export class GitHubPlatformClient implements PlatformClient {
         throw error;
       }
 
-      core.info("GitHub installation token cannot read /user; using github-actions[bot].");
+      core.info("GitHub installation token cannot read /user; using github-actions[bot]");
       return getGitHubActionsBotUser();
     }
   }
@@ -112,7 +112,7 @@ export class GitHubPlatformClient implements PlatformClient {
       body,
     });
 
-    core.info("Posted Codex pull request comment.");
+    core.info("Posted Codex pull request comment");
   }
 
   async setPullRequestAutomerge(enabled: boolean): Promise<void> {
@@ -127,7 +127,7 @@ export class GitHubPlatformClient implements PlatformClient {
         }`,
         { pullRequestId },
       );
-      core.info("Enabled GitHub pull request automerge.");
+      core.info("Enabled GitHub pull request automerge");
       return;
     }
 
@@ -140,7 +140,7 @@ export class GitHubPlatformClient implements PlatformClient {
         }`,
         { pullRequestId },
       );
-      core.info("Disabled GitHub pull request automerge.");
+      core.info("Disabled GitHub pull request automerge");
     } catch (error) {
       core.warning(`Could not disable GitHub pull request automerge: ${errorMessage(error)}`);
     }
@@ -260,7 +260,7 @@ export async function createGitHubAppInstallationAuthentication(
     });
 
   core.setSecret(installationAccessToken.token);
-  core.info(`Created GitHub App installation token for ${appSlug}.`);
+  core.info(`Created GitHub App installation token for ${appSlug}`);
 
   return {
     token: installationAccessToken.token,

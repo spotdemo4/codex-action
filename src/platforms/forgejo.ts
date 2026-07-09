@@ -84,7 +84,7 @@ export class ForgejoPlatformClient implements PlatformClient {
       { body },
     );
 
-    core.info("Posted Codex pull request comment.");
+    core.info("Posted Codex pull request comment");
   }
 
   async setPullRequestAutomerge(enabled: boolean): Promise<void> {
@@ -97,12 +97,12 @@ export class ForgejoPlatformClient implements PlatformClient {
           Do: "merge",
           merge_when_checks_succeed: true,
         });
-        core.info("Enabled forgejo pull request automerge.");
+        core.info("Enabled forgejo pull request automerge");
         return;
       }
 
       await forgejoRequest("DELETE", route, this.token);
-      core.info("Disabled forgejo pull request automerge.");
+      core.info("Disabled forgejo pull request automerge");
     } catch (error) {
       const suffix = error instanceof HttpError ? `HTTP ${error.status}` : errorMessage(error);
       core.warning(

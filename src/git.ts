@@ -7,7 +7,7 @@ import type { ActionUser, Platform, PullRequestPayload } from "./types.ts";
 export async function configureGitUser(workspace: string, user: ActionUser): Promise<void> {
   await runGit(["config", "user.name", user.login], workspace);
   await runGit(["config", "user.email", user.email], workspace);
-  core.info(`Configured git user as ${user.login} <${user.email}>.`);
+  core.info(`Configured git user as ${user.login} <${user.email}>`);
 }
 
 export async function hasGitChanges(workspace: string): Promise<boolean> {
@@ -20,7 +20,7 @@ export async function commitChanges(workspace: string, commitMessage: string): P
 
   await runGit(["add", "-A"], workspace);
   await runGit(["commit", "-m", message], workspace);
-  core.info("Committed Codex changes.");
+  core.info("Committed Codex changes");
 }
 
 export async function pushChanges(
@@ -33,7 +33,7 @@ export async function pushChanges(
     const pushRef = await resolvePushRef(workspace);
     await runGit(["push", "origin", `HEAD:${pushRef}`], workspace);
   });
-  core.info("Pushed Codex changes.");
+  core.info("Pushed Codex changes");
 }
 
 async function resolvePushRef(workspace: string): Promise<string> {

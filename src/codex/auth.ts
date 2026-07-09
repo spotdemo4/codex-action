@@ -26,14 +26,14 @@ export async function ensureCodexAuth(
       maskCodexAuth(authJson);
       writeCodexAuthJson(codexHome, authJson);
       loadedAuthFromSecret = true;
-      core.info("Loaded valid Codex auth from repository secret.");
+      core.info("Loaded valid Codex auth from repository secret");
     } catch (error) {
       core.warning(
         `Repository secret Codex auth is unavailable or invalid: ${errorMessage(error)}`,
       );
     }
   } else {
-    core.info("No Codex auth was provided by repository secret.");
+    core.info("No Codex auth was provided by repository secret");
   }
 
   if (!loadedAuthFromSecret) {
@@ -55,7 +55,7 @@ export async function ensureCodexAuth(
       await refreshCodexAuth(codexExecutable, codexHome, workspace);
     }
   } else {
-    core.info("Codex auth token is still fresh; refresh skipped.");
+    core.info("Codex auth token is still fresh; refresh skipped");
   }
 
   return persistCodexAuth(codexHome, auth, updateAuthSecret, { required: true });
@@ -81,13 +81,13 @@ export async function persistCodexAuth(
 
     if (authJson === getPreviousAuthJson(previousAuth)) {
       writeCodexAuthJson(codexHome, authJson);
-      core.info("Codex auth did not change; repository secret update skipped.");
+      core.info("Codex auth did not change; repository secret update skipped");
       return encodedAuth;
     }
 
     writeCodexAuthJson(codexHome, authJson);
     await updateAuthSecret(encodedAuth);
-    core.info("Stored refreshed Codex auth in repository secret.");
+    core.info("Stored refreshed Codex auth in repository secret");
     return encodedAuth;
   } catch (error) {
     const message = `Could not persist refreshed Codex auth: ${errorMessage(error)}`;
@@ -209,7 +209,7 @@ async function runCodexDeviceLogin(
   codexHome: string,
   workspace: string,
 ): Promise<void> {
-  core.info("Starting Codex device authorization. Complete the browser flow shown below.");
+  core.info("Starting Codex device authorization. Complete the browser flow shown below");
   await exec.exec(codexExecutable, ["login", "--device-auth"], {
     cwd: workspace,
     env: createCodexEnv(codexHome),
@@ -226,7 +226,7 @@ async function refreshCodexAuth(
   codexHome: string,
   workspace: string,
 ): Promise<void> {
-  core.info("Refreshing Codex auth before running the prompt.");
+  core.info("Refreshing Codex auth before running the prompt");
 
   const appServer = startCodexAppServer(codexExecutable, codexHome, workspace);
 
@@ -249,7 +249,7 @@ async function refreshCodexAuth(
     validateCodexAuthJson(authJson);
     maskCodexAuth(authJson);
     writeCodexAuthJson(codexHome, authJson);
-    core.info("Refreshed Codex auth before running the prompt.");
+    core.info("Refreshed Codex auth before running the prompt");
   } finally {
     await appServer.close();
   }

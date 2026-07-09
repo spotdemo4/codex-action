@@ -23,7 +23,7 @@ export async function setupCodexMcp(
 
   core.setSecret(platformClient.token);
   writeFileSync(path.join(codexHome, "config.toml"), buildCodexMcpConfig(server));
-  core.info(`Configured ${server.name} MCP server for Codex.`);
+  core.info(`Configured ${server.name} MCP server for Codex`);
 
   return {
     [server.tokenEnvVar]: platformClient.token,

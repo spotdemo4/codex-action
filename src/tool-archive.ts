@@ -25,11 +25,11 @@ export async function resolveCachedExecutable(
   const cachedDirectory = toolCache.find(asset.cacheName, asset.version, asset.target);
 
   if (cachedDirectory) {
-    core.info(`Using cached ${name} ${asset.version} for ${asset.target}.`);
+    core.info(`Using cached ${name} ${asset.version} for ${asset.target}`);
     return findArchiveExecutable(cachedDirectory, asset, platform);
   }
 
-  core.info(`Downloading ${name} ${asset.version} for ${asset.target}.`);
+  core.info(`Downloading ${name} ${asset.version} for ${asset.target}`);
   const archivePath = await toolCache.downloadTool(url);
   const extractedDirectory =
     asset.format === "zip"
@@ -43,7 +43,7 @@ export async function resolveCachedExecutable(
     asset.target,
   );
 
-  core.info(`Cached ${name} ${asset.version} for ${asset.target}.`);
+  core.info(`Cached ${name} ${asset.version} for ${asset.target}`);
   return findArchiveExecutable(cachedPath, asset, platform);
 }
 
