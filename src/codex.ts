@@ -60,7 +60,7 @@ export async function ensureCodexAuth(
 ): Promise<void> {
   if (auth) {
     try {
-      const authJson = decodeAuthSecret(auth);
+      const authJson = formatCodexAuthJson(decodeAuthSecret(auth));
       validateCodexAuthJson(authJson);
       maskCodexAuth(authJson);
       writeCodexAuthJson(codexHome, authJson);
@@ -82,9 +82,10 @@ export async function ensureCodexAuth(
     env: createCodexEnv(codexHome),
   });
 
-  const authJson = readCodexAuthJson(codexHome);
+  const authJson = formatCodexAuthJson(readCodexAuthJson(codexHome));
   validateCodexAuthJson(authJson);
   maskCodexAuth(authJson);
+  writeCodexAuthJson(codexHome, authJson);
   await validateCodexSdkAuth(codexExecutable, codexHome, workspace);
 }
 
@@ -113,6 +114,7 @@ export async function runCodexPrompt(
 
 export async function persistCodexAuth(
   codexHome: string,
+  previousAuth: string,
   updateAuthSecret: (value: string) => Promise<void>,
 ): Promise<void> {
   const authPath = path.join(codexHome, "auth.json");
@@ -122,9 +124,17 @@ export async function persistCodexAuth(
   }
 
   try {
-    const authJson = readCodexAuthJson(codexHome);
+    const authJson = formatCodexAuthJson(readCodexAuthJson(codexHome));
     validateCodexAuthJson(authJson);
     maskCodexAuth(authJson);
+
+    if (authJson === getPreviousAuthJson(previousAuth)) {
+      writeCodexAuthJson(codexHome, authJson);
+      core.info("Codex auth did not change; repository secret update skipped.");
+      return;
+    }
+
+    writeCodexAuthJson(codexHome, authJson);
     await updateAuthSecret(encodeAuthSecret(authJson));
     core.info("Stored refreshed Codex auth in repository secret.");
   } catch (error) {
@@ -133,7 +143,7 @@ export async function persistCodexAuth(
 }
 
 export function encodeAuthSecret(authJson: string): string {
-  return Buffer.from(authJson, "utf8").toString("base64");
+  return Buffer.from(formatCodexAuthJson(authJson), "utf8").toString("base64");
 }
 
 export function decodeAuthSecret(value: string): string {
@@ -148,6 +158,22 @@ export function decodeAuthSecret(value: string): string {
   }
 
   return Buffer.from(trimmed, "base64").toString("utf8");
+}
+
+export function formatCodexAuthJson(authJson: string): string {
+  const parsed = JSON.parse(authJson) as unknown;
+
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Codex auth.json must be a JSON object");
+  }
+
+  const formatted = JSON.stringify(sortJsonValue(parsed));
+
+  if (formatted === undefined) {
+    throw new Error("Codex auth.json could not be serialized");
+  }
+
+  return formatted;
 }
 
 async function validateCodexSdkAuth(
@@ -223,6 +249,38 @@ function validateCodexAuthJson(authJson: string): void {
       throw new Error(`Codex auth.json is missing tokens.${key}`);
     }
   }
+}
+
+function getPreviousAuthJson(auth: string): string | undefined {
+  if (!auth) {
+    return undefined;
+  }
+
+  try {
+    const authJson = formatCodexAuthJson(decodeAuthSecret(auth));
+    validateCodexAuthJson(authJson);
+    return authJson;
+  } catch {
+    return undefined;
+  }
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortJsonValue);
+  }
+
+  if (value !== null && typeof value === "object") {
+    const sorted: Record<string, unknown> = {};
+
+    for (const key of Object.keys(value).sort()) {
+      sorted[key] = sortJsonValue((value as Record<string, unknown>)[key]);
+    }
+
+    return sorted;
+  }
+
+  return value;
 }
 
 function maskCodexAuth(authJson: string): void {

@@ -43,7 +43,7 @@ export async function run(): Promise<void> {
       await setPullRequestAutomerge(platform, inputs.token, inputs.automerge);
     }
   } finally {
-    await persistCodexAuth(codexHome, (value) =>
+    await persistCodexAuth(codexHome, inputs.auth, (value) =>
       updateRepositoryAuthSecret(platform, inputs.token, inputs.authSecret, value),
     );
   }

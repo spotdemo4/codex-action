@@ -10,7 +10,12 @@ import {
   getCodexTargetTriple,
   getCodexVersionFromPackageJson,
 } from "../src/codex-binary.ts";
-import { decodeAuthSecret, encodeAuthSecret } from "../src/codex.ts";
+import {
+  decodeAuthSecret,
+  encodeAuthSecret,
+  formatCodexAuthJson,
+  persistCodexAuth,
+} from "../src/codex.ts";
 import { parseOptionalBoolean, resolvePromptInput, validateSecretName } from "../src/inputs.ts";
 import { detectPlatform } from "../src/platform.ts";
 
@@ -29,12 +34,57 @@ await test("parses optional boolean inputs", () => {
 });
 
 await test("encodes and decodes auth secret values", () => {
-  const authJson = JSON.stringify({ tokens: { id_token: "id" } });
+  const authJson = JSON.stringify({ tokens: { id_token: "id" }, extra: true });
   const encoded = encodeAuthSecret(authJson);
 
-  assert.equal(decodeAuthSecret(encoded), authJson);
+  assert.equal(decodeAuthSecret(encoded), formatCodexAuthJson(authJson));
   assert.equal(decodeAuthSecret(authJson), authJson);
   assert.throws(() => decodeAuthSecret(""), /empty/);
+});
+
+await test("formats Codex auth JSON consistently", () => {
+  assert.equal(
+    formatCodexAuthJson('{"tokens":{"refresh_token":"r","id_token":"i"},"extra":true}'),
+    '{"extra":true,"tokens":{"id_token":"i","refresh_token":"r"}}',
+  );
+});
+
+await test("skips auth secret updates when auth is unchanged", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "codex-action-test-"));
+  const authJson = JSON.stringify({
+    tokens: {
+      refresh_token: "refresh",
+      id_token: "id",
+      account_id: "account",
+      access_token: "access",
+    },
+  });
+  writeFileSync(path.join(directory, "auth.json"), authJson);
+
+  let updates = 0;
+  await persistCodexAuth(directory, encodeAuthSecret(authJson), async () => {
+    updates += 1;
+  });
+
+  assert.equal(updates, 0);
+
+  const changedAuthJson = JSON.stringify({
+    tokens: {
+      refresh_token: "refresh",
+      id_token: "id",
+      account_id: "account",
+      access_token: "changed",
+    },
+  });
+  let updatedSecret = "";
+  writeFileSync(path.join(directory, "auth.json"), changedAuthJson);
+  await persistCodexAuth(directory, encodeAuthSecret(authJson), async (value) => {
+    updates += 1;
+    updatedSecret = value;
+  });
+
+  assert.equal(updates, 1);
+  assert.equal(decodeAuthSecret(updatedSecret), formatCodexAuthJson(changedAuthJson));
 });
 
 await test("resolves prompt file paths", () => {
