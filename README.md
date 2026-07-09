@@ -60,6 +60,28 @@ Otherwise, the input value is used as the prompt text.
     prompt: .github/prompts/refactor.md
 ```
 
+### Writing Prompts
+
+Prompts should describe the repository task clearly enough for Codex to complete
+it without follow-up questions. For reusable automation, prefer a prompt file in
+the repository such as `.github/prompts/refactor.md`.
+
+Effective prompts usually include:
+
+- The concrete goal or outcome.
+- Relevant context, files, packages, or workflows to inspect first.
+- What is in scope and out of scope.
+- Required formatting, build, or test commands.
+- Project constraints such as compatibility, style, or minimal-change
+  expectations.
+- What to do if the requested change cannot be completed safely.
+
+Do not ask Codex to commit, push, or post comments directly. This action handles
+commits, pushes, pull request comments, and automerge after Codex finishes.
+
+Codex runs with workspace write access and without network access, so include any
+required external context in the repository or prompt text.
+
 ### Pull Requests
 
 On pull request events, Codex can leave a PR comment and optionally toggle
