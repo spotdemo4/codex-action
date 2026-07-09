@@ -35,15 +35,6 @@ const CODEX_OUTPUT_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const CODEX_AUTH_CHECK_SCHEMA = {
-  type: "object",
-  properties: {
-    ok: { type: "boolean" },
-  },
-  required: ["ok"],
-  additionalProperties: false,
-} as const;
-
 export function createCodexHome(): string {
   const base = process.env.RUNNER_TEMP ?? tmpdir();
   mkdirSync(base, { recursive: true });
@@ -57,7 +48,6 @@ export async function ensureCodexAuth(
   codexHome: string,
   codexExecutable: string,
   workspace: string,
-  model: string | undefined,
 ): Promise<void> {
   if (auth) {
     try {
@@ -65,7 +55,6 @@ export async function ensureCodexAuth(
       validateCodexAuthJson(authJson);
       maskCodexAuth(authJson);
       writeCodexAuthJson(codexHome, authJson);
-      await validateCodexSdkAuth(codexExecutable, codexHome, workspace, model);
       core.info("Loaded valid Codex auth from repository secret.");
       return;
     } catch (error) {
@@ -87,7 +76,6 @@ export async function ensureCodexAuth(
   validateCodexAuthJson(authJson);
   maskCodexAuth(authJson);
   writeCodexAuthJson(codexHome, authJson);
-  await validateCodexSdkAuth(codexExecutable, codexHome, workspace, model);
 }
 
 export async function runCodexPrompt(
@@ -181,29 +169,6 @@ export function formatCodexAuthJson(authJson: string): string {
   }
 
   return formatted;
-}
-
-async function validateCodexSdkAuth(
-  codexExecutable: string,
-  codexHome: string,
-  workspace: string,
-  model: string | undefined,
-): Promise<void> {
-  const codex = new Codex({
-    codexPathOverride: codexExecutable,
-    env: createCodexEnv(codexHome),
-  });
-  const thread = codex.startThread({
-    workingDirectory: workspace,
-    model,
-    sandboxMode: "read-only",
-    approvalPolicy: "never",
-    networkAccessEnabled: false,
-  });
-
-  await thread.run("Return ok true.", {
-    outputSchema: CODEX_AUTH_CHECK_SCHEMA,
-  });
 }
 
 function buildPrompt(prompt: string): string {

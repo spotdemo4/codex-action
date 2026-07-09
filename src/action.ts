@@ -14,7 +14,7 @@ export async function run(): Promise<void> {
   const codexExecutable = await resolveCodexExecutable();
 
   try {
-    await ensureCodexAuth(inputs.auth, codexHome, codexExecutable, workspace, inputs.model);
+    await ensureCodexAuth(inputs.auth, codexHome, codexExecutable, workspace);
 
     const user = await platformClient.getActionUser();
     await configureGitUser(workspace, user);
