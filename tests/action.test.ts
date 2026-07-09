@@ -20,6 +20,7 @@ import {
   getCodexExecutableNames,
   getCodexTargetTriple,
 } from "../src/codex/binary.ts";
+import { buildAuthenticatedRemoteUrl, buildCredentialIsolationGitArgs } from "../src/git.ts";
 import {
   parseOptionalBoolean,
   parseOptionalString,
@@ -202,6 +203,84 @@ await test("builds GitHub App bot identity values", () => {
   );
 });
 
+await test("builds authenticated GitHub push URLs", () => {
+  assert.equal(
+    buildAuthenticatedRemoteUrl(
+      "https://github.com/owner/repo.git",
+      "github",
+      createActionUser("octocat"),
+      "token",
+    ),
+    "https://x-access-token:token@github.com/owner/repo.git",
+  );
+});
+
+await test("builds authenticated Gitea and Forgejo push URLs", () => {
+  assert.equal(
+    buildAuthenticatedRemoteUrl(
+      "https://gitea.example/owner/repo.git",
+      "gitea",
+      createActionUser("bot"),
+      "token",
+    ),
+    "https://bot:token@gitea.example/owner/repo.git",
+  );
+  assert.equal(
+    buildAuthenticatedRemoteUrl(
+      "https://forgejo.example/owner/repo.git",
+      "forgejo",
+      createActionUser("bot"),
+      "token",
+    ),
+    "https://bot:token@forgejo.example/owner/repo.git",
+  );
+});
+
+await test("normalizes SSH-style remotes to authenticated HTTPS push URLs", () => {
+  assert.equal(
+    buildAuthenticatedRemoteUrl(
+      "git@github.com:owner/repo.git",
+      "github",
+      createActionUser("octocat"),
+      "token",
+    ),
+    "https://x-access-token:token@github.com/owner/repo.git",
+  );
+  assert.equal(
+    buildAuthenticatedRemoteUrl(
+      "ssh://git@github.com/owner/repo.git",
+      "github",
+      createActionUser("octocat"),
+      "token",
+    ),
+    "https://x-access-token:token@github.com/owner/repo.git",
+  );
+});
+
+await test("builds git config overrides that isolate push credentials", () => {
+  assert.deepEqual(
+    buildCredentialIsolationGitArgs("https://x-access-token:token@github.com/owner/repo.git"),
+    [
+      "-c",
+      "credential.helper=",
+      "-c",
+      "credential.https://github.com/.helper=",
+      "-c",
+      "credential.https://github.com/owner/repo.git.helper=",
+      "-c",
+      "credential.https://github.com/owner/repo.helper=",
+      "-c",
+      "http.extraheader=",
+      "-c",
+      "http.https://github.com/.extraheader=",
+      "-c",
+      "http.https://github.com/owner/repo.git.extraheader=",
+      "-c",
+      "http.https://github.com/owner/repo.extraheader=",
+    ],
+  );
+});
+
 await test("defines GitHub App installation token permissions", () => {
   assert.deepEqual(GITHUB_APP_INSTALLATION_PERMISSIONS, {
     actions: "read",
@@ -365,4 +444,12 @@ await test("finds target-named Codex release executables", () => {
 function createJwt(exp: number): string {
   const payload = Buffer.from(JSON.stringify({ exp }), "utf8").toString("base64url");
   return `header.${payload}.signature`;
+}
+
+function createActionUser(login: string) {
+  return {
+    login,
+    id: 1,
+    email: `${login}@example.com`,
+  };
 }

@@ -29,10 +29,26 @@ export async function pushChanges(
   user: ActionUser,
   token: string,
 ): Promise<void> {
-  await withAuthenticatedOrigin(workspace, platform, user, token, async () => {
-    const pushRef = await resolvePushRef(workspace);
-    await runGit(["push", "origin", `HEAD:${pushRef}`], workspace);
-  });
+  const { stdout } = await runGit(["remote", "get-url", "origin"], workspace);
+  const authenticatedUrl = buildAuthenticatedRemoteUrl(stdout.trim(), platform, user, token);
+
+  if (!authenticatedUrl) {
+    throw new Error("origin remote must be HTTP(S) or SSH-style to push with the action token");
+  }
+
+  core.setSecret(authenticatedUrl);
+
+  const pushRef = await resolvePushRef(workspace);
+  await runGit(
+    [
+      ...buildCredentialIsolationGitArgs(authenticatedUrl),
+      "push",
+      authenticatedUrl,
+      `HEAD:${pushRef}`,
+    ],
+    workspace,
+    { env: createNonInteractiveGitEnv() },
+  );
   core.info("Pushed Codex changes");
 }
 
@@ -58,47 +74,23 @@ async function resolvePushRef(workspace: string): Promise<string> {
   return branch;
 }
 
-async function withAuthenticatedOrigin(
+async function runGit(
+  args: string[],
   workspace: string,
-  platform: Platform,
-  user: ActionUser,
-  token: string,
-  callback: () => Promise<void>,
-): Promise<void> {
-  const { stdout } = await runGit(["remote", "get-url", "origin"], workspace);
-  const originalUrl = stdout.trim();
-  const authenticatedUrl = buildAuthenticatedRemoteUrl(originalUrl, platform, user, token);
-
-  if (!authenticatedUrl) {
-    await callback();
-    return;
-  }
-
-  core.setSecret(authenticatedUrl);
-  await runGit(["remote", "set-url", "origin", authenticatedUrl], workspace);
-
-  try {
-    await callback();
-  } finally {
-    await runGit(["remote", "set-url", "origin", originalUrl], workspace);
-  }
+  options: exec.ExecOptions = {},
+): Promise<exec.ExecOutput> {
+  return exec.getExecOutput("git", args, { ...options, cwd: workspace, silent: true });
 }
 
-async function runGit(args: string[], workspace: string): Promise<exec.ExecOutput> {
-  return exec.getExecOutput("git", args, { cwd: workspace, silent: true });
-}
-
-function buildAuthenticatedRemoteUrl(
+export function buildAuthenticatedRemoteUrl(
   remoteUrl: string,
   platform: Platform,
   user: ActionUser,
   token: string,
 ): string | null {
-  let url: URL;
+  const url = normalizeRemoteUrl(remoteUrl);
 
-  try {
-    url = new URL(remoteUrl);
-  } catch {
+  if (!url) {
     return null;
   }
 
@@ -114,4 +106,89 @@ function buildAuthenticatedRemoteUrl(
 
   url.password = token;
   return url.toString();
+}
+
+export function buildCredentialIsolationGitArgs(remoteUrl: string): string[] {
+  const configUrls = buildGitCredentialConfigUrls(remoteUrl);
+  const configValues = [
+    "credential.helper=",
+    ...configUrls.map((url) => `credential.${url}.helper=`),
+    "http.extraheader=",
+    ...configUrls.map((url) => `http.${url}.extraheader=`),
+  ];
+
+  return configValues.flatMap((value) => ["-c", value]);
+}
+
+function normalizeRemoteUrl(remoteUrl: string): URL | null {
+  try {
+    const url = new URL(remoteUrl);
+
+    if (url.protocol === "ssh:") {
+      return sshUrlToHttpsUrl(url);
+    }
+
+    return url;
+  } catch {
+    return scpLikeUrlToHttpsUrl(remoteUrl);
+  }
+}
+
+function sshUrlToHttpsUrl(url: URL): URL | null {
+  if (!url.hostname || !url.pathname || url.pathname === "/") {
+    return null;
+  }
+
+  return new URL(`https://${url.hostname}${url.pathname}`);
+}
+
+function scpLikeUrlToHttpsUrl(remoteUrl: string): URL | null {
+  const match = /^(?:[^@\s]+)@([^:\s]+):(.+)$/.exec(remoteUrl);
+  const host = match?.[1];
+  const path = match?.[2]?.replace(/^\/+/, "");
+
+  if (!host || !path) {
+    return null;
+  }
+
+  return new URL(`https://${host}/${path}`);
+}
+
+function buildGitCredentialConfigUrls(remoteUrl: string): string[] {
+  const url = normalizeRemoteUrl(remoteUrl);
+
+  if (!url || (url.protocol !== "http:" && url.protocol !== "https:")) {
+    return [];
+  }
+
+  url.username = "";
+  url.password = "";
+
+  const urls = new Set<string>([`${url.protocol}//${url.host}/`]);
+  const path = url.pathname.replace(/\/+$/, "");
+
+  if (path && path !== "/") {
+    const repoUrl = `${url.protocol}//${url.host}${path}`;
+    urls.add(repoUrl);
+
+    if (repoUrl.endsWith(".git")) {
+      urls.add(repoUrl.slice(0, -4));
+    }
+  }
+
+  return [...urls];
+}
+
+function createNonInteractiveGitEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+
+  env.GIT_ASKPASS = "";
+  env.GIT_TERMINAL_PROMPT = "0";
+  return env;
 }
