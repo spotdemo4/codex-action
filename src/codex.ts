@@ -595,6 +595,22 @@ type CodexItemPhase = "started" | "updated" | "completed";
 
 type CodexItem<T extends ThreadItem["type"]> = Extract<ThreadItem, { type: T }>;
 
+const ANSI_RESET = "\x1b[0m";
+
+const CODEX_LOG_LABEL_COLORS: Record<string, string> = {
+  thread: "\x1b[2m",
+  turn: "\x1b[2m",
+  message: "\x1b[97m",
+  reasoning: "\x1b[2m",
+  command: "\x1b[34m",
+  "command-output": "\x1b[2m",
+  file: "\x1b[35m",
+  tool: "\x1b[36m",
+  web: "\x1b[36m",
+  todo: "\x1b[33m",
+  error: "\x1b[31m",
+};
+
 async function logCodexStream(events: AsyncGenerator<ThreadEvent>): Promise<CodexStreamResult> {
   const state: CodexStreamState = {
     items: [],
@@ -782,14 +798,30 @@ function logCodexLine(label: string, text: string): void {
 
 function logCodexBlock(label: string, text: string): void {
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+  const prefix = formatCodexLogPrefix(label);
 
   if (!normalized.trim()) {
     return;
   }
 
   for (const line of normalized.split("\n")) {
-    core.info(`[codex:${label}] ${line}`);
+    core.info(`${prefix} ${line}`);
   }
+}
+
+function formatCodexLogPrefix(label: string): string {
+  const prefix = `[codex:${label}]`;
+  const color = CODEX_LOG_LABEL_COLORS[label];
+
+  if (!color || !codexLogColorsEnabled()) {
+    return prefix;
+  }
+
+  return `${color}${prefix}${ANSI_RESET}`;
+}
+
+function codexLogColorsEnabled(): boolean {
+  return process.env.NO_COLOR === undefined && process.env.FORCE_COLOR !== "0";
 }
 
 function formatInlineLogText(value: string): string {
