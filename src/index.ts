@@ -1,4 +1,9 @@
-import { hello } from "./hello.ts";
+import * as core from "@actions/core";
 
-const message = hello();
-console.log(message);
+import { run } from "./action.ts";
+
+try {
+  await run();
+} catch (error) {
+  core.setFailed(error instanceof Error ? error.message : String(error));
+}

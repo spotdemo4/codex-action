@@ -2,6 +2,23 @@ name: codex action
 description: use codex in a GitHub/Gitea/Forgejo action
 author: trev
 
+inputs:
+  redis:
+    description: URL to the Redis server used to store encrypted Codex auth
+    required: true
+  secret:
+    description: Secret used to encrypt and decrypt Codex auth stored in Redis
+    required: true
+  prompt:
+    description: Prompt text, or a path to a file containing the prompt
+    required: true
+  token:
+    description: GitHub, Gitea, or Forgejo token used for git and pull request APIs
+    required: true
+  automerge:
+    description: Set true to enable automerge, false to disable automerge, or omit for no-op
+    required: false
+
 runs:
   using: node24
   main: build/index.js

@@ -16,6 +16,12 @@
     "prepare": "rolldown -c && chmod +x build/index.js",
     "test": "node --test"
   },
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "@openai/codex-sdk": "^0.143.0",
+    "@redis/client": "^6.1.0"
+  },
   "devDependencies": {
     "@tsconfig/node-ts": "^23.6.4",
     "@tsconfig/node24": "^24.0.4",
