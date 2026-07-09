@@ -26,13 +26,13 @@ export function buildPrompt(prompt: string): string {
 
   return `${prompt.trim()}
 
-Codex action footer:
+Codex action instructions:
 - Make any requested repository changes directly in the working tree.
 - Do not commit, push, or post comments yourself; this action handles that after you finish.
 - When finished, return structured output matching the provided JSON schema.
 - If you made repository changes, set commit_message to a concise imperative commit message. If not, set it to an empty string.
 - ${prInstructions}
-- Platform MCP tools are available for repository, pull request, issue, and workflow context. Use them when helpful, but do not perform external writes through MCP.`;
+- Platform MCP tools are available for read-only repository, pull request, issue, and workflow context. Use them when helpful, but do not create, update, merge, comment, or otherwise write through MCP.`;
 }
 
 export function parseCodexMetadata(response: string): CodexRunMetadata {
