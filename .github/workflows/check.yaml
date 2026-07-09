@@ -37,3 +37,7 @@ jobs:
 
       - name: Run action
         uses: ./. # zizmor: ignore[unpinned-uses]
+        with:
+          auth: ${{ secrets.CODEX_ACTION_AUTH }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: Hello
