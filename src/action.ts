@@ -12,9 +12,19 @@ export async function run(): Promise<void> {
   const platformClient = createPlatformClient(inputs.token);
   const codexHome = createCodexHome();
   const codexExecutable = await resolveCodexExecutable();
+  const updateAuthSecret = (value: string) =>
+    platformClient.updateRepositoryAuthSecret(inputs.authSecret, value);
+  let currentAuth = inputs.auth;
 
   try {
-    await ensureCodexAuth(inputs.auth, codexHome, codexExecutable, workspace);
+    currentAuth =
+      (await ensureCodexAuth(
+        inputs.auth,
+        codexHome,
+        codexExecutable,
+        workspace,
+        updateAuthSecret,
+      )) ?? currentAuth;
 
     const user = await platformClient.getActionUser();
     await configureGitUser(workspace, user);
@@ -48,8 +58,6 @@ export async function run(): Promise<void> {
       await platformClient.setPullRequestAutomerge(inputs.automerge);
     }
   } finally {
-    await persistCodexAuth(codexHome, inputs.auth, (value) =>
-      platformClient.updateRepositoryAuthSecret(inputs.authSecret, value),
-    );
+    currentAuth = (await persistCodexAuth(codexHome, currentAuth, updateAuthSecret)) ?? currentAuth;
   }
 }

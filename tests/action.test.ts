@@ -16,6 +16,7 @@ import {
   decodeAuthSecret,
   encodeAuthSecret,
   formatCodexAuthJson,
+  isCodexAccountReadAuthenticated,
   persistCodexAuth,
 } from "../src/codex.ts";
 import {
@@ -59,6 +60,17 @@ await test("formats Codex auth JSON consistently", () => {
     formatCodexAuthJson('{"tokens":{"refresh_token":"r","id_token":"i"},"extra":true}'),
     '{"extra":true,"tokens":{"id_token":"i","refresh_token":"r"}}',
   );
+});
+
+await test("detects authenticated Codex account/read responses", () => {
+  assert.equal(
+    isCodexAccountReadAuthenticated({
+      account: { type: "chatgpt", email: null, planType: "plus" },
+      requiresOpenaiAuth: true,
+    }),
+    true,
+  );
+  assert.equal(isCodexAccountReadAuthenticated({ account: null, requiresOpenaiAuth: true }), false);
 });
 
 await test("skips auth secret updates when auth is unchanged", async () => {
