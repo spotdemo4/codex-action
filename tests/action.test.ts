@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
 import {
+  findCodexExecutable,
   getCodexReleaseAsset,
   getCodexReleaseAssetUrl,
+  getCodexExecutableNames,
   getCodexTargetTriple,
   getCodexVersionFromPackageJson,
 } from "../src/codex-binary.ts";
@@ -131,4 +133,18 @@ await test("maps platforms to Codex release assets", () => {
     getCodexReleaseAssetUrl("0.143.0", "aarch64-apple-darwin"),
     "https://github.com/openai/codex/releases/download/rust-v0.143.0/codex-aarch64-apple-darwin.tar.gz",
   );
+});
+
+await test("finds target-named Codex release executables", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "codex-action-test-"));
+  const nestedDirectory = path.join(directory, "nested");
+  const executable = path.join(nestedDirectory, "codex-x86_64-unknown-linux-musl");
+  mkdirSync(nestedDirectory);
+  writeFileSync(executable, "#!/bin/sh\n");
+
+  assert.deepEqual(getCodexExecutableNames("x86_64-unknown-linux-musl", "linux"), [
+    "codex",
+    "codex-x86_64-unknown-linux-musl",
+  ]);
+  assert.equal(findCodexExecutable(directory, "x86_64-unknown-linux-musl", "linux"), executable);
 });

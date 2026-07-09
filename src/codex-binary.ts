@@ -20,7 +20,7 @@ export async function resolveCodexExecutable(): Promise<string> {
 
   if (cachedDirectory) {
     core.info(`Using cached Codex ${version} for ${target}.`);
-    return findCodexExecutable(cachedDirectory);
+    return findCodexExecutable(cachedDirectory, target);
   }
 
   const asset = getCodexReleaseAsset(target);
@@ -31,11 +31,11 @@ export async function resolveCodexExecutable(): Promise<string> {
     asset.format === "zip"
       ? await toolCache.extractZip(archivePath)
       : await toolCache.extractTar(archivePath);
-  findCodexExecutable(extractedDirectory);
+  findCodexExecutable(extractedDirectory, target);
   const cachedPath = await toolCache.cacheDir(extractedDirectory, "codex", version, target);
 
   core.info(`Cached Codex ${version} for ${target}.`);
-  return findCodexExecutable(cachedPath);
+  return findCodexExecutable(cachedPath, target);
 }
 
 export function getCodexVersionFromPackageJson(packageJsonText: string): string {
@@ -141,18 +141,41 @@ export function getCodexReleaseAssetUrl(version: string, target: string): string
   return `https://github.com/openai/codex/releases/download/rust-v${version}/${assetName}`;
 }
 
-function findCodexExecutable(directory: string): string {
-  const executable = findFile(directory, process.platform === "win32" ? "codex.exe" : "codex");
+export function findCodexExecutable(
+  directory: string,
+  target: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const executable = findFirstFile(directory, getCodexExecutableNames(target, platform));
 
   if (!executable) {
-    throw new Error(`Downloaded Codex archive did not contain a codex executable in ${directory}`);
+    throw new Error(`Downloaded Codex archive did not contain a Codex executable in ${directory}`);
   }
 
-  if (process.platform !== "win32") {
+  if (platform !== "win32") {
     chmodSync(executable, 0o755);
   }
 
   return executable;
+}
+
+export function getCodexExecutableNames(
+  target: string,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  return platform === "win32" ? ["codex.exe", `codex-${target}.exe`] : ["codex", `codex-${target}`];
+}
+
+function findFirstFile(directory: string, fileNames: string[]): string | null {
+  for (const fileName of fileNames) {
+    const found = findFile(directory, fileName);
+
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
 }
 
 function findFile(directory: string, fileName: string): string | null {
