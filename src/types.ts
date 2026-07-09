@@ -14,6 +14,14 @@ export type ActionUser = {
   email: string;
 };
 
+export type PlatformClient = {
+  type: Platform;
+  getActionUser(): Promise<ActionUser>;
+  postPullRequestComment(body: string): Promise<void>;
+  setPullRequestAutomerge(enabled: boolean): Promise<void>;
+  updateRepositoryAuthSecret(secretName: string, value: string): Promise<void>;
+};
+
 export type CodexRunMetadata = {
   commitMessage: string;
   prComment: string;

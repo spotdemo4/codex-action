@@ -2,7 +2,13 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import sodium from "libsodium-wrappers";
 
-import type { ActionUser, GiteaUserResponse, Platform, PullRequestPayload } from "./types.ts";
+import type {
+  ActionUser,
+  GiteaUserResponse,
+  Platform,
+  PlatformClient,
+  PullRequestPayload,
+} from "./types.ts";
 import { errorMessage } from "./utils.ts";
 
 class HttpError extends Error {
@@ -27,10 +33,30 @@ export function detectPlatform(env: NodeJS.ProcessEnv = process.env): Platform {
   return "github";
 }
 
-export async function getActionUser(platform: Platform, token: string): Promise<ActionUser> {
+export function createPlatformClient(token: string): PlatformClient {
+  const platform = detectPlatform();
+
   if (platform === "github") {
-    const octokit = github.getOctokit(token);
-    const { data } = await octokit.rest.users.getAuthenticated();
+    return new GitHubPlatformClient(token);
+  }
+
+  return new ForgejoPlatformClient(platform, token);
+}
+
+export function isPullRequestEvent(): boolean {
+  return Boolean((github.context.payload as PullRequestPayload).pull_request);
+}
+
+class GitHubPlatformClient implements PlatformClient {
+  readonly type = "github";
+  private readonly octokit: ReturnType<typeof github.getOctokit>;
+
+  constructor(token: string) {
+    this.octokit = github.getOctokit(token);
+  }
+
+  async getActionUser(): Promise<ActionUser> {
+    const { data } = await this.octokit.rest.users.getAuthenticated();
 
     return {
       login: data.login,
@@ -39,96 +65,147 @@ export async function getActionUser(platform: Platform, token: string): Promise<
     };
   }
 
-  const response = await forgejoRequest<GiteaUserResponse>("GET", "/user", token);
-  const login = response.login ?? response.username ?? response.name;
-
-  if (!login) {
-    throw new Error(`${platform} user response did not include a login`);
-  }
-
-  const id = response.id ?? login;
-  const host = new URL(getServerUrl()).hostname;
-
-  return {
-    login,
-    id,
-    email: response.email || `${id}+${login}@users.noreply.${host}`,
-  };
-}
-
-export async function postPullRequestComment(
-  platform: Platform,
-  token: string,
-  body: string,
-): Promise<void> {
-  const issueNumber = getPullRequestNumber();
-
-  if (platform === "github") {
-    const octokit = github.getOctokit(token);
-    await octokit.rest.issues.createComment({
+  async postPullRequestComment(body: string): Promise<void> {
+    await this.octokit.rest.issues.createComment({
       ...github.context.repo,
-      issue_number: issueNumber,
+      issue_number: getPullRequestNumber(),
       body,
     });
-  } else {
+
+    core.info("Posted Codex pull request comment.");
+  }
+
+  async setPullRequestAutomerge(enabled: boolean): Promise<void> {
+    const pullRequestId = await this.getPullRequestNodeId();
+
+    if (enabled) {
+      await this.octokit.graphql(
+        `mutation($pullRequestId: ID!) {
+          enablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId}) {
+            pullRequest { id }
+          }
+        }`,
+        { pullRequestId },
+      );
+      core.info("Enabled GitHub pull request automerge.");
+      return;
+    }
+
+    try {
+      await this.octokit.graphql(
+        `mutation($pullRequestId: ID!) {
+          disablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId}) {
+            pullRequest { id }
+          }
+        }`,
+        { pullRequestId },
+      );
+      core.info("Disabled GitHub pull request automerge.");
+    } catch (error) {
+      core.warning(`Could not disable GitHub pull request automerge: ${errorMessage(error)}`);
+    }
+  }
+
+  async updateRepositoryAuthSecret(secretName: string, value: string): Promise<void> {
+    const publicKey = await this.octokit.rest.actions.getRepoPublicKey(github.context.repo);
+    const encryptedValue = await encryptGithubSecret(value, publicKey.data.key);
+
+    await this.octokit.rest.actions.createOrUpdateRepoSecret({
+      ...github.context.repo,
+      secret_name: secretName,
+      encrypted_value: encryptedValue,
+      key_id: publicKey.data.key_id,
+    });
+  }
+
+  private async getPullRequestNodeId(): Promise<string> {
+    const payload = github.context.payload as PullRequestPayload;
+
+    if (payload.pull_request?.node_id) {
+      return payload.pull_request.node_id;
+    }
+
+    const { data } = await this.octokit.rest.pulls.get({
+      ...github.context.repo,
+      pull_number: getPullRequestNumber(),
+    });
+
+    return data.node_id;
+  }
+}
+
+class ForgejoPlatformClient implements PlatformClient {
+  readonly type: "gitea" | "forgejo";
+  private readonly token: string;
+
+  constructor(type: "gitea" | "forgejo", token: string) {
+    this.type = type;
+    this.token = token;
+  }
+
+  async getActionUser(): Promise<ActionUser> {
+    const response = await forgejoRequest<GiteaUserResponse>("GET", "/user", this.token);
+    const login = response.login ?? response.username ?? response.name;
+
+    if (!login) {
+      throw new Error(`${this.type} user response did not include a login`);
+    }
+
+    const id = response.id ?? login;
+    const host = new URL(getServerUrl()).hostname;
+
+    return {
+      login,
+      id,
+      email: response.email || `${id}+${login}@users.noreply.${host}`,
+    };
+  }
+
+  async postPullRequestComment(body: string): Promise<void> {
     const { owner, repo } = github.context.repo;
     await forgejoRequest(
       "POST",
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments`,
-      token,
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${getPullRequestNumber()}/comments`,
+      this.token,
       { body },
     );
+
+    core.info("Posted Codex pull request comment.");
   }
 
-  core.info("Posted Codex pull request comment.");
-}
+  async setPullRequestAutomerge(enabled: boolean): Promise<void> {
+    const { owner, repo } = github.context.repo;
+    const route = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${getPullRequestNumber()}/merge`;
 
-export async function setPullRequestAutomerge(
-  platform: Platform,
-  token: string,
-  enabled: boolean,
-): Promise<void> {
-  if (platform === "github") {
-    await setGithubPullRequestAutomerge(token, enabled);
-    return;
+    try {
+      if (enabled) {
+        await forgejoRequest("POST", route, this.token, {
+          Do: "merge",
+          merge_when_checks_succeed: true,
+        });
+        core.info(`Enabled ${this.type} pull request automerge.`);
+        return;
+      }
+
+      await forgejoRequest("DELETE", route, this.token);
+      core.info(`Disabled ${this.type} pull request automerge.`);
+    } catch (error) {
+      const suffix = error instanceof HttpError ? `HTTP ${error.status}` : errorMessage(error);
+      core.warning(
+        `Could not ${enabled ? "enable" : "disable"} ${this.type} pull request automerge: ${suffix}`,
+      );
+    }
   }
 
-  await setForgejoPullRequestAutomerge(platform, token, enabled);
-}
-
-export async function updateRepositoryAuthSecret(
-  platform: Platform,
-  token: string,
-  secretName: string,
-  value: string,
-): Promise<void> {
-  if (platform === "github") {
-    await updateGithubRepositorySecret(token, secretName, value);
-    return;
+  async updateRepositoryAuthSecret(secretName: string, value: string): Promise<void> {
+    const { owner, repo } = github.context.repo;
+    await forgejoRequest(
+      "PUT",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/secrets/${encodeURIComponent(secretName)}`,
+      this.token,
+      { data: value },
+    );
   }
-
-  await updateForgejoRepositorySecret(token, secretName, value);
-}
-
-export function isPullRequestEvent(): boolean {
-  return Boolean((github.context.payload as PullRequestPayload).pull_request);
-}
-
-async function updateGithubRepositorySecret(
-  token: string,
-  secretName: string,
-  value: string,
-): Promise<void> {
-  const octokit = github.getOctokit(token);
-  const publicKey = await octokit.rest.actions.getRepoPublicKey(github.context.repo);
-  const encryptedValue = await encryptGithubSecret(value, publicKey.data.key);
-
-  await octokit.rest.actions.createOrUpdateRepoSecret({
-    ...github.context.repo,
-    secret_name: secretName,
-    encrypted_value: encryptedValue,
-    key_id: publicKey.data.key_id,
-  });
 }
 
 async function encryptGithubSecret(value: string, publicKey: string): Promise<string> {
@@ -136,97 +213,6 @@ async function encryptGithubSecret(value: string, publicKey: string): Promise<st
   const binaryPublicKey = sodium.from_base64(publicKey, sodium.base64_variants.ORIGINAL);
   const encryptedBytes = sodium.crypto_box_seal(value, binaryPublicKey);
   return sodium.to_base64(encryptedBytes, sodium.base64_variants.ORIGINAL);
-}
-
-async function updateForgejoRepositorySecret(
-  token: string,
-  secretName: string,
-  value: string,
-): Promise<void> {
-  const { owner, repo } = github.context.repo;
-  await forgejoRequest(
-    "PUT",
-    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/secrets/${encodeURIComponent(secretName)}`,
-    token,
-    { data: value },
-  );
-}
-
-async function setGithubPullRequestAutomerge(token: string, enabled: boolean): Promise<void> {
-  const octokit = github.getOctokit(token);
-  const pullRequestId = await getGithubPullRequestNodeId(token);
-
-  if (enabled) {
-    await octokit.graphql(
-      `mutation($pullRequestId: ID!) {
-        enablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId}) {
-          pullRequest { id }
-        }
-      }`,
-      { pullRequestId },
-    );
-    core.info("Enabled GitHub pull request automerge.");
-    return;
-  }
-
-  try {
-    await octokit.graphql(
-      `mutation($pullRequestId: ID!) {
-        disablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId}) {
-          pullRequest { id }
-        }
-      }`,
-      { pullRequestId },
-    );
-    core.info("Disabled GitHub pull request automerge.");
-  } catch (error) {
-    core.warning(`Could not disable GitHub pull request automerge: ${errorMessage(error)}`);
-  }
-}
-
-async function getGithubPullRequestNodeId(token: string): Promise<string> {
-  const payload = github.context.payload as PullRequestPayload;
-
-  if (payload.pull_request?.node_id) {
-    return payload.pull_request.node_id;
-  }
-
-  const octokit = github.getOctokit(token);
-  const { data } = await octokit.rest.pulls.get({
-    ...github.context.repo,
-    pull_number: getPullRequestNumber(),
-  });
-
-  return data.node_id;
-}
-
-async function setForgejoPullRequestAutomerge(
-  platform: Platform,
-  token: string,
-  enabled: boolean,
-): Promise<void> {
-  const { owner, repo } = github.context.repo;
-  const issueNumber = getPullRequestNumber();
-  const route = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${issueNumber}/merge`;
-
-  try {
-    if (enabled) {
-      await forgejoRequest("POST", route, token, {
-        Do: "merge",
-        merge_when_checks_succeed: true,
-      });
-      core.info(`Enabled ${platform} pull request automerge.`);
-      return;
-    }
-
-    await forgejoRequest("DELETE", route, token);
-    core.info(`Disabled ${platform} pull request automerge.`);
-  } catch (error) {
-    const suffix = error instanceof HttpError ? `HTTP ${error.status}` : errorMessage(error);
-    core.warning(
-      `Could not ${enabled ? "enable" : "disable"} ${platform} pull request automerge: ${suffix}`,
-    );
-  }
 }
 
 async function forgejoRequest<T = unknown>(
