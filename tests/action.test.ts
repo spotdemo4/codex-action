@@ -10,14 +10,15 @@ import {
   getCodexTargetTriple,
   getCodexVersionFromPackageJson,
 } from "../src/codex-binary.ts";
-import { decryptText, encryptText } from "../src/crypto.ts";
-import { parseOptionalBoolean, resolvePromptInput, validateRedisUrl } from "../src/inputs.ts";
+import { decodeAuthSecret, encodeAuthSecret } from "../src/codex.ts";
+import { parseOptionalBoolean, resolvePromptInput, validateSecretName } from "../src/inputs.ts";
 import { detectPlatform } from "../src/platform.ts";
 
-await test("validates Redis URLs", () => {
-  assert.equal(validateRedisUrl("redis://localhost:6379/0"), "redis://localhost:6379/0");
-  assert.equal(validateRedisUrl("rediss://cache.example.com"), "rediss://cache.example.com");
-  assert.throws(() => validateRedisUrl("https://cache.example.com"), /redis:\/\/ or rediss:\/\//);
+await test("validates auth secret names", () => {
+  assert.equal(validateSecretName("CODEX_ACTION_AUTH"), "CODEX_ACTION_AUTH");
+  assert.equal(validateSecretName("codex_action_auth"), "codex_action_auth");
+  assert.throws(() => validateSecretName("1CODEX"), /auth-secret/);
+  assert.throws(() => validateSecretName("GITHUB_TOKEN"), /GITHUB_/);
 });
 
 await test("parses optional boolean inputs", () => {
@@ -27,11 +28,13 @@ await test("parses optional boolean inputs", () => {
   assert.throws(() => parseOptionalBoolean("maybe"), /automerge/);
 });
 
-await test("encrypts and decrypts text", () => {
-  const encrypted = encryptText("hello", "secret");
+await test("encodes and decodes auth secret values", () => {
+  const authJson = JSON.stringify({ tokens: { id_token: "id" } });
+  const encoded = encodeAuthSecret(authJson);
 
-  assert.equal(decryptText(encrypted, "secret"), "hello");
-  assert.throws(() => decryptText(encrypted, "wrong"));
+  assert.equal(decodeAuthSecret(encoded), authJson);
+  assert.equal(decodeAuthSecret(authJson), authJson);
+  assert.throws(() => decodeAuthSecret(""), /empty/);
 });
 
 await test("resolves prompt file paths", () => {

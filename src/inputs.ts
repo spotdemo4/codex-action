@@ -4,46 +4,45 @@ import path from "node:path";
 import * as core from "@actions/core";
 
 import type { ActionInputs } from "./types.ts";
-import { errorMessage } from "./utils.ts";
+
+const DEFAULT_AUTH_SECRET = "CODEX_ACTION_AUTH";
 
 export function readInputs(): ActionInputs {
-  const redis = core.getInput("redis", { required: true });
-  const secret = core.getInput("secret", { required: true });
+  const auth = core.getInput("auth");
+  const authSecret = validateSecretName(core.getInput("auth-secret") || DEFAULT_AUTH_SECRET);
   const prompt = core.getInput("prompt", { required: true });
   const token = core.getInput("token", { required: true });
   const automerge = parseOptionalBoolean(core.getInput("automerge"));
 
-  core.setSecret(redis);
-  core.setSecret(secret);
+  if (auth) {
+    core.setSecret(auth);
+  }
+
   core.setSecret(token);
 
   return {
-    redis: validateRedisUrl(redis),
-    secret,
+    auth,
+    authSecret,
     prompt,
     token,
     automerge,
   };
 }
 
-export function validateRedisUrl(value: string): string {
-  let url: URL;
+export function validateSecretName(value: string): string {
+  const name = value.trim();
 
-  try {
-    url = new URL(value);
-  } catch (error) {
-    throw new Error(`redis must be a valid URL: ${errorMessage(error)}`);
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error(
+      "auth-secret must contain only letters, numbers, and underscores, and cannot start with a number",
+    );
   }
 
-  if (url.protocol !== "redis:" && url.protocol !== "rediss:") {
-    throw new Error("redis must use the redis:// or rediss:// scheme");
+  if (name.toUpperCase().startsWith("GITHUB_")) {
+    throw new Error("auth-secret must not start with GITHUB_");
   }
 
-  if (!url.hostname) {
-    throw new Error("redis must include a hostname");
-  }
-
-  return url.toString();
+  return name;
 }
 
 export function parseOptionalBoolean(value: string): boolean | undefined {

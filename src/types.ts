@@ -1,13 +1,8 @@
 export type Platform = "github" | "gitea" | "forgejo";
 
-export type RedisClient = {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<unknown>;
-};
-
 export type ActionInputs = {
-  redis: string;
-  secret: string;
+  auth: string;
+  authSecret: string;
   prompt: string;
   token: string;
   automerge: boolean | undefined;

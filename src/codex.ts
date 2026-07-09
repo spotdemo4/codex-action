@@ -12,13 +12,10 @@ import path from "node:path";
 import * as core from "@actions/core";
 import { Codex } from "@openai/codex-sdk";
 
-import { decryptText, encryptText } from "./crypto.ts";
 import { isPullRequestEvent } from "./platform.ts";
 import { runInheritedProcess } from "./process.ts";
-import type { CodexRunMetadata, RedisClient } from "./types.ts";
+import type { CodexRunMetadata } from "./types.ts";
 import { errorMessage } from "./utils.ts";
-
-const REDIS_AUTH_KEY = "codex-action:v1:auth";
 
 const CODEX_OUTPUT_SCHEMA = {
   type: "object",
@@ -56,28 +53,27 @@ export function createCodexHome(): string {
 }
 
 export async function ensureCodexAuth(
-  redis: RedisClient,
-  secret: string,
+  auth: string,
   codexHome: string,
   codexExecutable: string,
   workspace: string,
 ): Promise<void> {
-  const encrypted = await redis.get(REDIS_AUTH_KEY);
-
-  if (encrypted) {
+  if (auth) {
     try {
-      const authJson = decryptText(encrypted, secret);
+      const authJson = decodeAuthSecret(auth);
       validateCodexAuthJson(authJson);
       maskCodexAuth(authJson);
       writeCodexAuthJson(codexHome, authJson);
       await validateCodexSdkAuth(codexExecutable, codexHome, workspace);
-      core.info("Loaded valid Codex auth from Redis.");
+      core.info("Loaded valid Codex auth from repository secret.");
       return;
     } catch (error) {
-      core.warning(`Stored Codex auth is unavailable or invalid: ${errorMessage(error)}`);
+      core.warning(
+        `Repository secret Codex auth is unavailable or invalid: ${errorMessage(error)}`,
+      );
     }
   } else {
-    core.info("No Codex auth was found in Redis.");
+    core.info("No Codex auth was provided by repository secret.");
   }
 
   core.info("Starting Codex device authorization. Complete the browser flow shown below.");
@@ -90,7 +86,6 @@ export async function ensureCodexAuth(
   validateCodexAuthJson(authJson);
   maskCodexAuth(authJson);
   await validateCodexSdkAuth(codexExecutable, codexHome, workspace);
-  await storeCodexAuth(redis, secret, authJson);
 }
 
 export async function runCodexPrompt(
@@ -117,9 +112,8 @@ export async function runCodexPrompt(
 }
 
 export async function persistCodexAuth(
-  redis: RedisClient,
-  secret: string,
   codexHome: string,
+  updateAuthSecret: (value: string) => Promise<void>,
 ): Promise<void> {
   const authPath = path.join(codexHome, "auth.json");
 
@@ -131,10 +125,29 @@ export async function persistCodexAuth(
     const authJson = readCodexAuthJson(codexHome);
     validateCodexAuthJson(authJson);
     maskCodexAuth(authJson);
-    await storeCodexAuth(redis, secret, authJson);
+    await updateAuthSecret(encodeAuthSecret(authJson));
+    core.info("Stored refreshed Codex auth in repository secret.");
   } catch (error) {
     core.warning(`Could not persist refreshed Codex auth: ${errorMessage(error)}`);
   }
+}
+
+export function encodeAuthSecret(authJson: string): string {
+  return Buffer.from(authJson, "utf8").toString("base64");
+}
+
+export function decodeAuthSecret(value: string): string {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    throw new Error("auth secret is empty");
+  }
+
+  if (trimmed.startsWith("{")) {
+    return trimmed;
+  }
+
+  return Buffer.from(trimmed, "base64").toString("utf8");
 }
 
 async function validateCodexSdkAuth(
@@ -244,9 +257,4 @@ function readCodexAuthJson(codexHome: string): string {
   }
 
   return readFileSync(authPath, "utf8");
-}
-
-async function storeCodexAuth(redis: RedisClient, secret: string, authJson: string): Promise<void> {
-  await redis.set(REDIS_AUTH_KEY, encryptText(authJson, secret));
-  core.info("Stored encrypted Codex auth in Redis.");
 }

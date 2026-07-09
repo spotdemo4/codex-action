@@ -1,5 +1,4 @@
 import * as core from "@actions/core";
-import { createClient } from "@redis/client";
 
 import { resolveCodexExecutable } from "./codex-binary.ts";
 import { createCodexHome, ensureCodexAuth, persistCodexAuth, runCodexPrompt } from "./codex.ts";
@@ -11,8 +10,8 @@ import {
   isPullRequestEvent,
   postPullRequestComment,
   setPullRequestAutomerge,
+  updateRepositoryAuthSecret,
 } from "./platform.ts";
-import { errorMessage } from "./utils.ts";
 
 export async function run(): Promise<void> {
   const inputs = readInputs();
@@ -20,16 +19,9 @@ export async function run(): Promise<void> {
   const platform = detectPlatform();
   const codexHome = createCodexHome();
   const codexExecutable = await resolveCodexExecutable();
-  const redis = createClient({ url: inputs.redis });
-
-  redis.on("error", (error) => {
-    core.warning(`Redis client error: ${errorMessage(error)}`);
-  });
-
-  await redis.connect();
 
   try {
-    await ensureCodexAuth(redis, inputs.secret, codexHome, codexExecutable, workspace);
+    await ensureCodexAuth(inputs.auth, codexHome, codexExecutable, workspace);
 
     const user = await getActionUser(platform, inputs.token);
     await configureGitUser(workspace, user);
@@ -51,7 +43,8 @@ export async function run(): Promise<void> {
       await setPullRequestAutomerge(platform, inputs.token, inputs.automerge);
     }
   } finally {
-    await persistCodexAuth(redis, inputs.secret, codexHome);
-    await redis.quit();
+    await persistCodexAuth(codexHome, (value) =>
+      updateRepositoryAuthSecret(platform, inputs.token, inputs.authSecret, value),
+    );
   }
 }

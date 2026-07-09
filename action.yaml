@@ -3,12 +3,13 @@ description: use codex in a GitHub/Gitea/Forgejo action
 author: trev
 
 inputs:
-  redis:
-    description: URL to the Redis server used to store encrypted Codex auth
-    required: true
-  secret:
-    description: Secret used to encrypt and decrypt Codex auth stored in Redis
-    required: true
+  auth:
+    description: Current base64-encoded Codex auth.json from a repository secret
+    required: false
+  auth-secret:
+    description: Repository secret name to update with refreshed Codex auth
+    required: false
+    default: CODEX_ACTION_AUTH
   prompt:
     description: Prompt text, or a path to a file containing the prompt
     required: true

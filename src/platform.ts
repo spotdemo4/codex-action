@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
+import sodium from "libsodium-wrappers";
 
 import type { ActionUser, GiteaUserResponse, Platform, PullRequestPayload } from "./types.ts";
 import { errorMessage } from "./utils.ts";
@@ -95,8 +96,60 @@ export async function setPullRequestAutomerge(
   await setForgejoPullRequestAutomerge(platform, token, enabled);
 }
 
+export async function updateRepositoryAuthSecret(
+  platform: Platform,
+  token: string,
+  secretName: string,
+  value: string,
+): Promise<void> {
+  if (platform === "github") {
+    await updateGithubRepositorySecret(token, secretName, value);
+    return;
+  }
+
+  await updateForgejoRepositorySecret(token, secretName, value);
+}
+
 export function isPullRequestEvent(): boolean {
   return Boolean((github.context.payload as PullRequestPayload).pull_request);
+}
+
+async function updateGithubRepositorySecret(
+  token: string,
+  secretName: string,
+  value: string,
+): Promise<void> {
+  const octokit = github.getOctokit(token);
+  const publicKey = await octokit.rest.actions.getRepoPublicKey(github.context.repo);
+  const encryptedValue = await encryptGithubSecret(value, publicKey.data.key);
+
+  await octokit.rest.actions.createOrUpdateRepoSecret({
+    ...github.context.repo,
+    secret_name: secretName,
+    encrypted_value: encryptedValue,
+    key_id: publicKey.data.key_id,
+  });
+}
+
+async function encryptGithubSecret(value: string, publicKey: string): Promise<string> {
+  await sodium.ready;
+  const binaryPublicKey = sodium.from_base64(publicKey, sodium.base64_variants.ORIGINAL);
+  const encryptedBytes = sodium.crypto_box_seal(value, binaryPublicKey);
+  return sodium.to_base64(encryptedBytes, sodium.base64_variants.ORIGINAL);
+}
+
+async function updateForgejoRepositorySecret(
+  token: string,
+  secretName: string,
+  value: string,
+): Promise<void> {
+  const { owner, repo } = github.context.repo;
+  await forgejoRequest(
+    "PUT",
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/secrets/${encodeURIComponent(secretName)}`,
+    token,
+    { data: value },
+  );
 }
 
 async function setGithubPullRequestAutomerge(token: string, enabled: boolean): Promise<void> {
