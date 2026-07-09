@@ -105,10 +105,11 @@ export async function runCodexPrompt(
   workspace: string,
   prompt: string,
   model: string | undefined,
+  extraEnv: Record<string, string> = {},
 ): Promise<CodexRunMetadata> {
   const codex = new Codex({
     codexPathOverride: codexExecutable,
-    env: createCodexEnv(codexHome),
+    env: createCodexEnv(codexHome, extraEnv),
   });
   const thread = codex.startThread({
     workingDirectory: workspace,
@@ -554,7 +555,8 @@ Codex action footer:
 - Do not commit, push, or post comments yourself; this action handles that after you finish.
 - When finished, return structured output matching the provided JSON schema.
 - If you made repository changes, set commit_message to a concise imperative commit message. If not, set it to an empty string.
-- ${prInstructions}`;
+- ${prInstructions}
+- Platform MCP tools are available for repository, pull request, issue, and workflow context. Use them when helpful, but do not perform external writes through MCP.`;
 }
 
 function parseCodexMetadata(response: string): CodexRunMetadata {
@@ -575,7 +577,10 @@ function logCodexText(title: string, text: string): void {
   core.endGroup();
 }
 
-function createCodexEnv(codexHome: string): Record<string, string> {
+function createCodexEnv(
+  codexHome: string,
+  extraEnv: Record<string, string> = {},
+): Record<string, string> {
   const env: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(process.env)) {
@@ -587,6 +592,7 @@ function createCodexEnv(codexHome: string): Record<string, string> {
   env.CODEX_HOME = codexHome;
   env.NO_COLOR = "1";
   env.npm_config_loglevel = "error";
+  Object.assign(env, extraEnv);
   return env;
 }
 

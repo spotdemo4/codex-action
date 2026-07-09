@@ -14,6 +14,7 @@ import type {
 import { errorMessage } from "./utils.ts";
 
 export const GITHUB_APP_INSTALLATION_PERMISSIONS = {
+  actions: "read",
   contents: "write",
   issues: "write",
   pull_requests: "write",

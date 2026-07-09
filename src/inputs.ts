@@ -15,7 +15,7 @@ export function readInputs(): ActionInputs {
   const token = parseOptionalString(core.getInput("token"));
   const githubAppClientId = parseOptionalString(core.getInput("client-id"));
   const githubAppPrivateKey = parseOptionalString(core.getInput("private-key"));
-  const automerge = parseOptionalBoolean(core.getInput("automerge"));
+  const automerge = parseOptionalBoolean(core.getInput("automerge"), "automerge");
 
   validateActionAuthentication(token, githubAppClientId, githubAppPrivateKey);
 
@@ -84,7 +84,7 @@ export function validateSecretName(value: string): string {
   return name;
 }
 
-export function parseOptionalBoolean(value: string): boolean | undefined {
+export function parseOptionalBoolean(value: string, name: string): boolean | undefined {
   const normalized = value.trim().toLowerCase();
 
   if (!normalized) {
@@ -99,7 +99,7 @@ export function parseOptionalBoolean(value: string): boolean | undefined {
     return false;
   }
 
-  throw new Error("automerge must be true, false, or omitted");
+  throw new Error(`${name} must be true, false, or omitted`);
 }
 
 export function resolvePromptInput(input: string, workspace: string): string {

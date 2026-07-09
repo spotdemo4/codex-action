@@ -41,10 +41,30 @@ jobs:
 
 The GitHub App installation must grant these repository permissions:
 
+- Actions: read
 - Contents: read and write
 - Issues: read and write
 - Pull requests: read and write
 - Secrets: read and write
+
+### MCP Context
+
+The action exposes the matching platform MCP server to Codex with the same API
+token used by the action. This lets Codex inspect pull request comments, issues,
+repository data, and workflow context through MCP tools instead of relying on
+pre-generated prompt text.
+
+No container runtime is required. The action downloads and caches the matching
+release binary with `@actions/tool-cache`:
+
+- `github-mcp-server` from `github/github-mcp-server` on GitHub, with the
+  `repos`, `issues`, `pull_requests`, and `actions` toolsets in read-only mode.
+- `forgejo-mcp` from `goern/forgejo-mcp` on Gitea or Forgejo, pointed at the
+  current server URL.
+
+The API token is forwarded through environment variables and is not written to
+Codex MCP configuration. On GitHub App setups, the installation must include the
+Actions read permission so Codex can inspect workflow context.
 
 ### Prompt File
 
@@ -79,8 +99,8 @@ Effective prompts usually include:
 Do not ask Codex to commit, push, or post comments directly. This action handles
 commits, pushes, pull request comments, and automerge after Codex finishes.
 
-Codex runs with workspace write access and without network access, so include any
-required external context in the repository or prompt text.
+Codex runs with workspace write access and without shell network access. The
+configured MCP server can access the platform API with the action token.
 
 ### Pull Requests
 
@@ -113,7 +133,7 @@ jobs:
 ### Gitea or Forgejo
 
 On Gitea and Forgejo, pass a token with repository contents, pull request, issue
-comment, and Actions secret access.
+comment, workflow, and Actions secret access.
 
 ```yaml
 name: codex

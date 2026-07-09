@@ -29,6 +29,12 @@ import {
   validateSecretName,
 } from "../src/inputs.ts";
 import {
+  buildCodexMcpConfig,
+  createMcpServerConfig,
+  getMcpReleaseAsset,
+  getMcpReleaseAssetUrl,
+} from "../src/mcp.ts";
+import {
   buildGitHubNoreplyEmail,
   createGitHubAppJwt,
   detectPlatform,
@@ -47,10 +53,10 @@ await test("validates auth secret names", () => {
 });
 
 await test("parses optional boolean inputs", () => {
-  assert.equal(parseOptionalBoolean(""), undefined);
-  assert.equal(parseOptionalBoolean("true"), true);
-  assert.equal(parseOptionalBoolean("OFF"), false);
-  assert.throws(() => parseOptionalBoolean("maybe"), /automerge/);
+  assert.equal(parseOptionalBoolean("", "automerge"), undefined);
+  assert.equal(parseOptionalBoolean("true", "automerge"), true);
+  assert.equal(parseOptionalBoolean("OFF", "automerge"), false);
+  assert.throws(() => parseOptionalBoolean("maybe", "automerge"), /automerge/);
 });
 
 await test("parses optional string inputs", () => {
@@ -198,11 +204,70 @@ await test("builds GitHub App bot identity values", () => {
 
 await test("defines GitHub App installation token permissions", () => {
   assert.deepEqual(GITHUB_APP_INSTALLATION_PERMISSIONS, {
+    actions: "read",
     contents: "write",
     issues: "write",
     pull_requests: "write",
     secrets: "write",
   });
+});
+
+await test("builds GitHub MCP config without embedding the token", () => {
+  const server = createMcpServerConfig("github", "/tools/github-mcp-server", "https://github.com");
+  const config = buildCodexMcpConfig(server);
+
+  assert.match(config, /\[mcp_servers\.github\]/);
+  assert.match(config, /command = "\/tools\/github-mcp-server"/);
+  assert.match(config, /args = \["stdio"\]/);
+  assert.match(config, /GITHUB_TOOLSETS = "repos,issues,pull_requests,actions"/);
+  assert.match(config, /GITHUB_READ_ONLY = "1"/);
+  assert.match(config, /env_vars = \["GITHUB_PERSONAL_ACCESS_TOKEN"\]/);
+  assert.doesNotMatch(config, /secret-token/);
+});
+
+await test("builds Forgejo MCP config without embedding the token", () => {
+  const server = createMcpServerConfig("forgejo", "/tools/forgejo-mcp", "https://codeberg.org");
+  const config = buildCodexMcpConfig(server);
+
+  assert.match(config, /\[mcp_servers\.forgejo\]/);
+  assert.match(config, /command = "\/tools\/forgejo-mcp"/);
+  assert.match(config, /--transport/);
+  assert.match(config, /https:\/\/codeberg\.org/);
+  assert.match(config, /env_vars = \["FORGEJO_ACCESS_TOKEN"\]/);
+  assert.doesNotMatch(config, /secret-token/);
+});
+
+await test("maps platforms to GitHub MCP release assets", () => {
+  assert.deepEqual(getMcpReleaseAsset("github", "linux", "x64"), {
+    cacheName: "github-mcp-server",
+    version: "1.5.0",
+    target: "Linux-x86_64",
+    assetName: "github-mcp-server_Linux_x86_64.tar.gz",
+    format: "tar",
+    executableNames: ["github-mcp-server"],
+  });
+
+  assert.equal(
+    getMcpReleaseAssetUrl("github", "win32", "arm64"),
+    "https://github.com/github/github-mcp-server/releases/download/v1.5.0/github-mcp-server_Windows_arm64.zip",
+  );
+});
+
+await test("maps platforms to Forgejo MCP release assets", () => {
+  assert.deepEqual(getMcpReleaseAsset("forgejo", "darwin", "arm64"), {
+    cacheName: "forgejo-mcp",
+    version: "2.30.1",
+    target: "darwin-arm64",
+    assetName: "forgejo-mcp_2.30.1_darwin_arm64.tar.gz",
+    format: "tar",
+    executableNames: ["forgejo-mcp"],
+  });
+
+  assert.equal(
+    getMcpReleaseAssetUrl("gitea", "linux", "x64"),
+    "https://codeberg.org/goern/forgejo-mcp/releases/download/v2.30.1/forgejo-mcp_2.30.1_linux_amd64.tar.gz",
+  );
+  assert.throws(() => getMcpReleaseAsset("forgejo", "win32", "x64"), /Unsupported Forgejo/);
 });
 
 await test("creates GitHub App JWTs", () => {
