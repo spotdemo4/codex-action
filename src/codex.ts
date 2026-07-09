@@ -105,9 +105,13 @@ export async function runCodexPrompt(
     approvalPolicy: "never",
     networkAccessEnabled: false,
   });
-  const turn = await thread.run(buildPrompt(prompt), {
+  const codexPrompt = buildPrompt(prompt);
+
+  logCodexText("Codex prompt", codexPrompt);
+  const turn = await thread.run(codexPrompt, {
     outputSchema: CODEX_OUTPUT_SCHEMA,
   });
+  logCodexText("Codex response", turn.finalResponse);
 
   return parseCodexMetadata(turn.finalResponse);
 }
@@ -222,6 +226,12 @@ function parseCodexMetadata(response: string): CodexRunMetadata {
     commitMessage: typeof parsed.commit_message === "string" ? parsed.commit_message.trim() : "",
     prComment: typeof parsed.pr_comment === "string" ? parsed.pr_comment.trim() : "",
   };
+}
+
+function logCodexText(title: string, text: string): void {
+  core.startGroup(title);
+  core.info(text);
+  core.endGroup();
 }
 
 function createCodexEnv(codexHome: string): Record<string, string> {
