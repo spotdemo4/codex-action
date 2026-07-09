@@ -5,17 +5,14 @@ import path from "node:path";
 import { test } from "node:test";
 
 import {
-  decryptText,
-  detectPlatform,
-  encryptText,
   getCodexReleaseAsset,
   getCodexReleaseAssetUrl,
   getCodexTargetTriple,
   getCodexVersionFromPackageJson,
-  parseOptionalBoolean,
-  resolvePromptInput,
-  validateRedisUrl,
-} from "../src/action.ts";
+} from "../src/codex-binary.ts";
+import { decryptText, encryptText } from "../src/crypto.ts";
+import { parseOptionalBoolean, resolvePromptInput, validateRedisUrl } from "../src/inputs.ts";
+import { detectPlatform } from "../src/platform.ts";
 
 await test("validates Redis URLs", () => {
   assert.equal(validateRedisUrl("redis://localhost:6379/0"), "redis://localhost:6379/0");
