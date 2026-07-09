@@ -43,7 +43,7 @@ import {
   GITHUB_APP_INSTALLATION_PERMISSIONS,
   isGitHubAppInstallationUserError,
   normalizePrivateKey,
-} from "../src/platform.ts";
+} from "../src/platforms/index.ts";
 
 await test("validates auth secret names", () => {
   assert.equal(validateSecretName("CODEX_ACTION_AUTH"), "CODEX_ACTION_AUTH");

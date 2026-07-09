@@ -5,7 +5,7 @@ import { createCodexHome, ensureCodexAuth, persistCodexAuth, runCodexPrompt } fr
 import { commitChanges, configureGitUser, hasGitChanges, pushChanges } from "./git.ts";
 import { readInputs, resolvePromptInput } from "./inputs.ts";
 import { setupCodexMcp } from "./mcp.ts";
-import { createPlatformClient, isPullRequestEvent } from "./platform.ts";
+import { createPlatformClient, isPullRequestEvent } from "./platforms/index.ts";
 
 export async function run(): Promise<void> {
   const inputs = readInputs();
@@ -33,7 +33,7 @@ export async function run(): Promise<void> {
 
     const user = await platformClient.getActionUser();
     await configureGitUser(workspace, user);
-    const codexEnv = await setupCodexMcp(codexHome, platformClient.type, platformClient.token);
+    const codexEnv = await setupCodexMcp(codexHome, platformClient);
 
     const prompt = resolvePromptInput(inputs.prompt, workspace);
     const metadata = await runCodexPrompt(

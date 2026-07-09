@@ -1,5 +1,29 @@
 export type Platform = "github" | "gitea" | "forgejo";
 
+export type McpReleaseAsset = {
+  cacheName: string;
+  version: string;
+  target: string;
+  assetName: string;
+  format: "tar" | "zip";
+  executableNames: string[];
+};
+
+export type McpServerConfig = {
+  name: string;
+  command: string;
+  tokenEnvVar: string;
+  args: string[];
+  env: Record<string, string>;
+};
+
+export type PlatformMcp = {
+  createServerConfig(executable: string, serverUrl: string): McpServerConfig;
+  getReleaseAsset(nodePlatform?: NodeJS.Platform, arch?: string): McpReleaseAsset;
+  getReleaseAssetUrl(nodePlatform?: NodeJS.Platform, arch?: string): string;
+  getExecutableOverride(): string | undefined;
+};
+
 export type ActionInputs = {
   auth: string;
   authSecret: string;
@@ -21,6 +45,7 @@ export type ActionUser = {
 export type PlatformClient = {
   type: Platform;
   token: string;
+  mcp: PlatformMcp;
   getActionUser(): Promise<ActionUser>;
   postPullRequestComment(body: string): Promise<void>;
   setPullRequestAutomerge(enabled: boolean): Promise<void>;
