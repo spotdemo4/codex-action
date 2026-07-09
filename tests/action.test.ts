@@ -6,21 +6,21 @@ import path from "node:path";
 import { test } from "node:test";
 
 import {
-  findCodexExecutable,
-  getCodexReleaseAsset,
-  getCodexReleaseAssetUrl,
-  getCodexExecutableNames,
-  getCodexTargetTriple,
-  getCodexVersionFromPackageJson,
-} from "../src/codex-binary.ts";
-import {
   codexAuthNeedsRefresh,
   decodeAuthSecret,
   encodeAuthSecret,
   formatCodexAuthJson,
   isCodexAccountReadAuthenticated,
   persistCodexAuth,
-} from "../src/codex.ts";
+} from "../src/codex/auth.ts";
+import {
+  findCodexExecutable,
+  getCodexReleaseAsset,
+  getCodexReleaseAssetUrl,
+  getCodexExecutableNames,
+  getCodexTargetTriple,
+  getCodexVersionFromPackageJson,
+} from "../src/codex/binary.ts";
 import {
   parseOptionalBoolean,
   parseOptionalString,

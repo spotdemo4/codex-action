@@ -59,7 +59,7 @@ export function getCodexVersionFromPackageJson(packageJsonText: string): string 
 
 function getCodexPackageVersion(): string {
   return getCodexVersionFromPackageJson(
-    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
   );
 }
 

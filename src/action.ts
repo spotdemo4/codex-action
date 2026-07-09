@@ -1,7 +1,9 @@
 import * as core from "@actions/core";
 
-import { resolveCodexExecutable } from "./codex-binary.ts";
-import { createCodexHome, ensureCodexAuth, persistCodexAuth, runCodexPrompt } from "./codex.ts";
+import { ensureCodexAuth, persistCodexAuth } from "./codex/auth.ts";
+import { resolveCodexExecutable } from "./codex/binary.ts";
+import { createCodexHome } from "./codex/home.ts";
+import { runCodexPrompt } from "./codex/runner.ts";
 import { commitChanges, configureGitUser, hasGitChanges, pushChanges } from "./git.ts";
 import { readInputs, resolvePromptInput } from "./inputs.ts";
 import { setupCodexMcp } from "./mcp.ts";
