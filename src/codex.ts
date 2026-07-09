@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
@@ -117,6 +118,7 @@ export async function runCodexPrompt(
     sandboxMode: "workspace-write",
     approvalPolicy: "never",
     networkAccessEnabled: false,
+    additionalDirectories: getAdditionalWritableDirectories(workspace),
   });
   const codexPrompt = buildPrompt(prompt);
 
@@ -634,7 +636,8 @@ function formatCodexFileChangeItem(item: Record<string, unknown>): string {
         .join(", ")
     : "";
   const suffix = changes ? `: ${changes}` : "";
-  return `file_change ${getString(item, "status") ?? "unknown"}${suffix}`;
+  const failureDetails = item.status === "failed" ? formatCodexFailureDetails(item) : "";
+  return `file_change ${getString(item, "status") ?? "unknown"}${suffix}${failureDetails}`;
 }
 
 function formatCodexCommandExecutionItem(item: Record<string, unknown>): string {
@@ -654,6 +657,22 @@ function formatCodexMcpToolCallItem(item: Record<string, unknown>): string {
   const errorSuffix = error ? `: ${error}` : "";
 
   return `mcp_tool_call ${getString(item, "status") ?? "unknown"}: ${server}/${tool}${errorSuffix}`;
+}
+
+function formatCodexFailureDetails(item: Record<string, unknown>): string {
+  const message = getString(item, "message") ?? getString(item, "reason");
+
+  if (message) {
+    return `: ${truncateLogText(message)}`;
+  }
+
+  if (isRecord(item.error)) {
+    const errorMessage = getString(item.error, "message") ?? JSON.stringify(item.error);
+    return errorMessage ? `: ${truncateLogText(errorMessage)}` : "";
+  }
+
+  const json = JSON.stringify(item);
+  return json ? `: ${truncateLogText(json)}` : "";
 }
 
 function formatCodexTodoListItem(item: Record<string, unknown>): string {
@@ -685,6 +704,19 @@ function getNumber(record: Record<string, unknown>, key: string): number | undef
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function getAdditionalWritableDirectories(workspace: string): string[] {
+  const directories = [workspace];
+
+  try {
+    const realWorkspace = realpathSync(workspace);
+    directories.push(realWorkspace);
+  } catch {
+    // Keep the original workspace path when realpath resolution is unavailable.
+  }
+
+  return [...new Set(directories)];
 }
 
 function createCodexEnv(
