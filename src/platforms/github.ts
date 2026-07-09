@@ -12,6 +12,7 @@ import type {
   PullRequestPayload,
 } from "../types.ts";
 import { errorMessage } from "../utils.ts";
+import { getPullRequestNumber } from "./context.ts";
 
 export const GITHUB_APP_INSTALLATION_PERMISSIONS = {
   actions: "read",
@@ -328,15 +329,4 @@ async function encryptGithubSecret(value: string, publicKey: string): Promise<st
 
 function base64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
-}
-
-function getPullRequestNumber(): number {
-  const payload = github.context.payload as PullRequestPayload;
-  const issueNumber = payload.pull_request?.number ?? payload.number ?? github.context.issue.number;
-
-  if (!issueNumber) {
-    throw new Error("This action is not running for a pull request event");
-  }
-
-  return issueNumber;
 }

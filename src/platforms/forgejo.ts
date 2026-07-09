@@ -7,9 +7,9 @@ import type {
   McpReleaseAsset,
   PlatformClient,
   PlatformMcp,
-  PullRequestPayload,
 } from "../types.ts";
 import { errorMessage } from "../utils.ts";
+import { getPullRequestNumber, getServerUrl } from "./context.ts";
 
 const FORGEJO_MCP_VERSION = "2.30.1";
 
@@ -194,21 +194,6 @@ async function forgejoRequest<T = unknown>(
   }
 
   return JSON.parse(text) as T;
-}
-
-function getPullRequestNumber(): number {
-  const payload = github.context.payload as PullRequestPayload;
-  const issueNumber = payload.pull_request?.number ?? payload.number ?? github.context.issue.number;
-
-  if (!issueNumber) {
-    throw new Error("This action is not running for a pull request event");
-  }
-
-  return issueNumber;
-}
-
-function getServerUrl(): string {
-  return process.env.GITHUB_SERVER_URL || github.context.serverUrl;
 }
 
 function ensureTrailingSlash(value: string): string {

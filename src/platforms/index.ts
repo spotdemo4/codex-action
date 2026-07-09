@@ -1,6 +1,4 @@
-import * as github from "@actions/github";
-
-import type { Platform, PlatformClient, PlatformMcp, PullRequestPayload } from "../types.ts";
+import type { Platform, PlatformClient, PlatformMcp } from "../types.ts";
 import { ForgejoPlatformClient, forgejoMcp } from "./forgejo.ts";
 import { GiteaPlatformClient, giteaMcp } from "./gitea.ts";
 import {
@@ -64,10 +62,6 @@ export async function createPlatformClient(
   return new ForgejoPlatformClient(options.token);
 }
 
-export function isPullRequestEvent(): boolean {
-  return Boolean((github.context.payload as PullRequestPayload).pull_request);
-}
-
 export function getPlatformMcp(platform: Platform): PlatformMcp {
   if (platform === "github") {
     return githubMcp;
@@ -80,6 +74,7 @@ export function getPlatformMcp(platform: Platform): PlatformMcp {
   return forgejoMcp;
 }
 
+export { isPullRequestEvent } from "./context.ts";
 export { ForgejoPlatformClient } from "./forgejo.ts";
 export { GiteaPlatformClient } from "./gitea.ts";
 export {

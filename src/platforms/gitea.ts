@@ -7,9 +7,9 @@ import type {
   McpReleaseAsset,
   PlatformClient,
   PlatformMcp,
-  PullRequestPayload,
 } from "../types.ts";
 import { errorMessage } from "../utils.ts";
+import { getPullRequestNumber, getServerUrl } from "./context.ts";
 
 const GITEA_MCP_VERSION = "1.3.0";
 
@@ -199,21 +199,6 @@ async function giteaRequest<T = unknown>(
   }
 
   return JSON.parse(text) as T;
-}
-
-function getPullRequestNumber(): number {
-  const payload = github.context.payload as PullRequestPayload;
-  const issueNumber = payload.pull_request?.number ?? payload.number ?? github.context.issue.number;
-
-  if (!issueNumber) {
-    throw new Error("This action is not running for a pull request event");
-  }
-
-  return issueNumber;
-}
-
-function getServerUrl(): string {
-  return process.env.GITHUB_SERVER_URL || github.context.serverUrl;
 }
 
 function ensureTrailingSlash(value: string): string {

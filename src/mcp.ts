@@ -1,11 +1,11 @@
-import { chmodSync, readdirSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 
 import * as core from "@actions/core";
-import * as github from "@actions/github";
-import * as toolCache from "@actions/tool-cache";
 
+import { getServerUrl } from "./platforms/context.ts";
 import { getPlatformMcp } from "./platforms/index.ts";
+import { findArchiveExecutable, resolveCachedExecutable } from "./tool-archive.ts";
 import type {
   McpReleaseAsset,
   McpServerConfig,
@@ -38,30 +38,7 @@ export async function resolveMcpExecutable(platformMcp: PlatformMcp): Promise<st
   }
 
   const asset = platformMcp.getReleaseAsset();
-  const cachedDirectory = toolCache.find(asset.cacheName, asset.version, asset.target);
-
-  if (cachedDirectory) {
-    core.info(`Using cached ${asset.cacheName} ${asset.version} for ${asset.target}.`);
-    return findMcpExecutable(cachedDirectory, asset);
-  }
-
-  const url = platformMcp.getReleaseAssetUrl();
-  core.info(`Downloading ${asset.cacheName} ${asset.version} for ${asset.target}.`);
-  const archivePath = await toolCache.downloadTool(url);
-  const extractedDirectory =
-    asset.format === "zip"
-      ? await toolCache.extractZip(archivePath)
-      : await toolCache.extractTar(archivePath);
-  findMcpExecutable(extractedDirectory, asset);
-  const cachedPath = await toolCache.cacheDir(
-    extractedDirectory,
-    asset.cacheName,
-    asset.version,
-    asset.target,
-  );
-
-  core.info(`Cached ${asset.cacheName} ${asset.version} for ${asset.target}.`);
-  return findMcpExecutable(cachedPath, asset);
+  return resolveCachedExecutable(asset, platformMcp.getReleaseAssetUrl());
 }
 
 export function createMcpServerConfig(
@@ -89,19 +66,7 @@ export function getMcpReleaseAssetUrl(
 }
 
 export function findMcpExecutable(directory: string, asset: McpReleaseAsset): string {
-  const executable = findFirstFile(directory, asset.executableNames);
-
-  if (!executable) {
-    throw new Error(
-      `Downloaded ${asset.cacheName} archive did not contain an executable in ${directory}`,
-    );
-  }
-
-  if (process.platform !== "win32") {
-    chmodSync(executable, 0o755);
-  }
-
-  return executable;
+  return findArchiveExecutable(directory, asset);
 }
 
 export function buildCodexMcpConfig(server: McpServerConfig): string {
@@ -115,42 +80,6 @@ export function buildCodexMcpConfig(server: McpServerConfig): string {
 
   lines.push(`env_vars = ${tomlArray([server.tokenEnvVar])}`);
   return `${lines.join("\n")}\n`;
-}
-
-function getServerUrl(): string {
-  return process.env.GITHUB_SERVER_URL || github.context.serverUrl;
-}
-
-function findFirstFile(directory: string, fileNames: string[]): string | null {
-  for (const fileName of fileNames) {
-    const found = findFile(directory, fileName);
-
-    if (found) {
-      return found;
-    }
-  }
-
-  return null;
-}
-
-function findFile(directory: string, fileName: string): string | null {
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const entryPath = path.join(directory, entry.name);
-
-    if (entry.isFile() && entry.name === fileName) {
-      return entryPath;
-    }
-
-    if (entry.isDirectory()) {
-      const found = findFile(entryPath, fileName);
-
-      if (found) {
-        return found;
-      }
-    }
-  }
-
-  return null;
 }
 
 function tomlArray(values: string[]): string {

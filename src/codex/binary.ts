@@ -1,8 +1,11 @@
-import { chmodSync, readdirSync, readFileSync } from "node:fs";
-import path from "node:path";
+import { readFileSync } from "node:fs";
 
-import * as core from "@actions/core";
-import * as toolCache from "@actions/tool-cache";
+import {
+  findArchiveExecutable,
+  resolveCachedExecutable,
+  type ToolArchiveAsset,
+  type ToolArchiveExecutableSpec,
+} from "../tool-archive.ts";
 
 export async function resolveCodexExecutable(): Promise<string> {
   if (process.env.CODEX_PATH) {
@@ -16,26 +19,10 @@ export async function resolveCodexExecutable(): Promise<string> {
     throw new Error(`Unsupported Codex platform: ${process.platform} (${process.arch})`);
   }
 
-  const cachedDirectory = toolCache.find("codex", version, target);
-
-  if (cachedDirectory) {
-    core.info(`Using cached Codex ${version} for ${target}.`);
-    return findCodexExecutable(cachedDirectory, target);
-  }
-
-  const asset = getCodexReleaseAsset(target);
+  const asset = getCodexToolArchiveAsset(version, target);
   const url = getCodexReleaseAssetUrl(version, target);
-  core.info(`Downloading Codex ${version} for ${target}.`);
-  const archivePath = await toolCache.downloadTool(url);
-  const extractedDirectory =
-    asset.format === "zip"
-      ? await toolCache.extractZip(archivePath)
-      : await toolCache.extractTar(archivePath);
-  findCodexExecutable(extractedDirectory, target);
-  const cachedPath = await toolCache.cacheDir(extractedDirectory, "codex", version, target);
 
-  core.info(`Cached Codex ${version} for ${target}.`);
-  return findCodexExecutable(cachedPath, target);
+  return resolveCachedExecutable(asset, url);
 }
 
 export function getCodexVersionFromPackageJson(packageJsonText: string): string {
@@ -146,17 +133,7 @@ export function findCodexExecutable(
   target: string,
   platform: NodeJS.Platform = process.platform,
 ): string {
-  const executable = findFirstFile(directory, getCodexExecutableNames(target, platform));
-
-  if (!executable) {
-    throw new Error(`Downloaded Codex archive did not contain a Codex executable in ${directory}`);
-  }
-
-  if (platform !== "win32") {
-    chmodSync(executable, 0o755);
-  }
-
-  return executable;
+  return findArchiveExecutable(directory, getCodexExecutableSpec(target, platform), platform);
 }
 
 export function getCodexExecutableNames(
@@ -166,34 +143,22 @@ export function getCodexExecutableNames(
   return platform === "win32" ? ["codex.exe", `codex-${target}.exe`] : ["codex", `codex-${target}`];
 }
 
-function findFirstFile(directory: string, fileNames: string[]): string | null {
-  for (const fileName of fileNames) {
-    const found = findFile(directory, fileName);
-
-    if (found) {
-      return found;
-    }
-  }
-
-  return null;
+function getCodexToolArchiveAsset(version: string, target: string): ToolArchiveAsset {
+  return {
+    ...getCodexExecutableSpec(target),
+    ...getCodexReleaseAsset(target),
+    version,
+    target,
+  };
 }
 
-function findFile(directory: string, fileName: string): string | null {
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const entryPath = path.join(directory, entry.name);
-
-    if (entry.isFile() && entry.name === fileName) {
-      return entryPath;
-    }
-
-    if (entry.isDirectory()) {
-      const found = findFile(entryPath, fileName);
-
-      if (found) {
-        return found;
-      }
-    }
-  }
-
-  return null;
+function getCodexExecutableSpec(
+  target: string,
+  platform: NodeJS.Platform = process.platform,
+): ToolArchiveExecutableSpec {
+  return {
+    cacheName: "codex",
+    displayName: "Codex",
+    executableNames: getCodexExecutableNames(target, platform),
+  };
 }
