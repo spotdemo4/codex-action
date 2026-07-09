@@ -115,7 +115,7 @@ export async function runCodexPrompt(
   const thread = codex.startThread({
     workingDirectory: workspace,
     model,
-    sandboxMode: "workspace-write",
+    sandboxMode: "danger-full-access",
     approvalPolicy: "never",
     networkAccessEnabled: false,
     additionalDirectories: getAdditionalWritableDirectories(workspace),

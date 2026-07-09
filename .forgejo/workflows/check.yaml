@@ -44,13 +44,7 @@ jobs:
           model: gpt-5.3-codex-spark
           dry-run: true
           prompt: |
-            You must modify the working tree as the only task.
-            Create or overwrite the relative path `.codex-action-check.txt` with exactly this single line:
-            codex-action dry-run check
-            Do not use an absolute path for the file edit.
-            If a file editing tool fails, use this shell command instead:
-            printf '%s\n' 'codex-action dry-run check' > .codex-action-check.txt
-            Do not finish until the file exists and `git status --porcelain` shows it as changed.
+            Create or update .codex-action-check.txt with a single line saying "codex-action dry-run check".
 
       - name: Verify dry-run change
         run: |
