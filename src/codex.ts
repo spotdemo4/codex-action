@@ -57,6 +57,7 @@ export async function ensureCodexAuth(
   codexHome: string,
   codexExecutable: string,
   workspace: string,
+  model: string | undefined,
 ): Promise<void> {
   if (auth) {
     try {
@@ -64,7 +65,7 @@ export async function ensureCodexAuth(
       validateCodexAuthJson(authJson);
       maskCodexAuth(authJson);
       writeCodexAuthJson(codexHome, authJson);
-      await validateCodexSdkAuth(codexExecutable, codexHome, workspace);
+      await validateCodexSdkAuth(codexExecutable, codexHome, workspace, model);
       core.info("Loaded valid Codex auth from repository secret.");
       return;
     } catch (error) {
@@ -86,7 +87,7 @@ export async function ensureCodexAuth(
   validateCodexAuthJson(authJson);
   maskCodexAuth(authJson);
   writeCodexAuthJson(codexHome, authJson);
-  await validateCodexSdkAuth(codexExecutable, codexHome, workspace);
+  await validateCodexSdkAuth(codexExecutable, codexHome, workspace, model);
 }
 
 export async function runCodexPrompt(
@@ -94,6 +95,7 @@ export async function runCodexPrompt(
   codexHome: string,
   workspace: string,
   prompt: string,
+  model: string | undefined,
 ): Promise<CodexRunMetadata> {
   const codex = new Codex({
     codexPathOverride: codexExecutable,
@@ -101,6 +103,7 @@ export async function runCodexPrompt(
   });
   const thread = codex.startThread({
     workingDirectory: workspace,
+    model,
     sandboxMode: "workspace-write",
     approvalPolicy: "never",
     networkAccessEnabled: false,
@@ -184,6 +187,7 @@ async function validateCodexSdkAuth(
   codexExecutable: string,
   codexHome: string,
   workspace: string,
+  model: string | undefined,
 ): Promise<void> {
   const codex = new Codex({
     codexPathOverride: codexExecutable,
@@ -191,6 +195,7 @@ async function validateCodexSdkAuth(
   });
   const thread = codex.startThread({
     workingDirectory: workspace,
+    model,
     sandboxMode: "read-only",
     approvalPolicy: "never",
     networkAccessEnabled: false,

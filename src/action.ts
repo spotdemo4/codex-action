@@ -14,13 +14,19 @@ export async function run(): Promise<void> {
   const codexExecutable = await resolveCodexExecutable();
 
   try {
-    await ensureCodexAuth(inputs.auth, codexHome, codexExecutable, workspace);
+    await ensureCodexAuth(inputs.auth, codexHome, codexExecutable, workspace, inputs.model);
 
     const user = await platformClient.getActionUser();
     await configureGitUser(workspace, user);
 
     const prompt = resolvePromptInput(inputs.prompt, workspace);
-    const metadata = await runCodexPrompt(codexExecutable, codexHome, workspace, prompt);
+    const metadata = await runCodexPrompt(
+      codexExecutable,
+      codexHome,
+      workspace,
+      prompt,
+      inputs.model,
+    );
 
     if (await hasGitChanges(workspace)) {
       await commitAndPushChanges(

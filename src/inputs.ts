@@ -11,6 +11,7 @@ export function readInputs(): ActionInputs {
   const auth = core.getInput("auth");
   const authSecret = validateSecretName(core.getInput("auth-secret") || DEFAULT_AUTH_SECRET);
   const prompt = core.getInput("prompt", { required: true });
+  const model = parseOptionalString(core.getInput("model"));
   const token = core.getInput("token", { required: true });
   const automerge = parseOptionalBoolean(core.getInput("automerge"));
 
@@ -24,9 +25,15 @@ export function readInputs(): ActionInputs {
     auth,
     authSecret,
     prompt,
+    model,
     token,
     automerge,
   };
+}
+
+export function parseOptionalString(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed || undefined;
 }
 
 export function validateSecretName(value: string): string {

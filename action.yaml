@@ -13,6 +13,9 @@ inputs:
   prompt:
     description: Prompt text, or a path to a file containing the prompt
     required: true
+  model:
+    description: Optional Codex model to use
+    required: false
   token:
     description: GitHub, Gitea, or Forgejo token used for git and pull request APIs
     required: true

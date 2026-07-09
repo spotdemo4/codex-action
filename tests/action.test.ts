@@ -18,7 +18,12 @@ import {
   formatCodexAuthJson,
   persistCodexAuth,
 } from "../src/codex.ts";
-import { parseOptionalBoolean, resolvePromptInput, validateSecretName } from "../src/inputs.ts";
+import {
+  parseOptionalBoolean,
+  parseOptionalString,
+  resolvePromptInput,
+  validateSecretName,
+} from "../src/inputs.ts";
 import { detectPlatform } from "../src/platform.ts";
 
 await test("validates auth secret names", () => {
@@ -33,6 +38,11 @@ await test("parses optional boolean inputs", () => {
   assert.equal(parseOptionalBoolean("true"), true);
   assert.equal(parseOptionalBoolean("OFF"), false);
   assert.throws(() => parseOptionalBoolean("maybe"), /automerge/);
+});
+
+await test("parses optional string inputs", () => {
+  assert.equal(parseOptionalString(""), undefined);
+  assert.equal(parseOptionalString("  gpt-5.1-codex-max  "), "gpt-5.1-codex-max");
 });
 
 await test("encodes and decodes auth secret values", () => {

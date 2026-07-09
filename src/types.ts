@@ -4,6 +4,7 @@ export type ActionInputs = {
   auth: string;
   authSecret: string;
   prompt: string;
+  model: string | undefined;
   token: string;
   automerge: boolean | undefined;
 };
