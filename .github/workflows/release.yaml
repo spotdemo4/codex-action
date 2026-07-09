@@ -17,25 +17,17 @@ jobs:
     permissions:
       id-token: write
       contents: write
-      packages: write
     steps:
       - name: Initialize
         uses: spotdemo4/nix-init@1443d93dfa3ca2f043b37f848631d6ac5563b0ec # v1.56.0
         with:
-          fetch_depth: 0
           shell: release
 
       - name: Release to GitHub
-        run: flake-release
+        run: |
+          set -euo pipefail
+          gh release create "${TAG}" --repo "${REPOSITORY}" --title "${TAG}" --verify-tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PACKAGES: |
-            appimages.x86_64-linux.default.aarch64-unknown-linux-gnu
-            appimages.x86_64-linux.default.armv7l-unknown-linux-gnueabihf
-            appimages.x86_64-linux.default.x86_64-unknown-linux-gnu
-            images.x86_64-linux.default.aarch64-unknown-linux-gnu
-            images.x86_64-linux.default.armv7l-unknown-linux-gnueabihf
-            images.x86_64-linux.default.x86_64-unknown-linux-gnu
-
-      # - name: Release to NPM
-      #   run: npm publish --access public
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}

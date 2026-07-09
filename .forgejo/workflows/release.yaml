@@ -20,26 +20,17 @@ jobs:
           token: ${{ secrets.DOCTOR_TOKEN }}
           niks3_url: https://niks3.trev.zip
           shell: release
-          fetch_depth: 0
 
       - name: Release to Forgejo
-        run: flake-release
+        run: |
+          set -euo pipefail
+          server_host="${SERVER_URL#https://}"
+          server_host="${server_host#http://}"
+          fj --host "${server_host}" auth add-key "${FORGEJO_USER}" "${FORGEJO_TOKEN}"
+          fj --host "${server_host}" release create "${TAG}" --repo "${REPOSITORY}" --tag "${TAG}"
         env:
-          REGISTRY: trev.zip
-          GITHUB_TOKEN: ${{ secrets.DOCTOR_TOKEN }}
-          REGISTRY_PASSWORD: ${{ secrets.PACKAGE_TOKEN }}
-          DELETE_OLD_RELEASE_ARTIFACTS: true
-          PACKAGES: |
-            appimages.x86_64-linux.default.x86_64-unknown-linux-gnu
-            images.x86_64-linux.default.x86_64-unknown-linux-gnu
-
-      - name: Release to NPM
-        env:
+          FORGEJO_TOKEN: ${{ secrets.DOCTOR_TOKEN }}
+          FORGEJO_USER: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
           SERVER_URL: ${{ forgejo.SERVER_URL }}
-          REPOSITORY_OWNER: ${{ forgejo.REPOSITORY_OWNER }}
-          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
-        run: | # zizmor: ignore[use-trusted-publishing]
-          npm config set @trev:registry "${SERVER_URL}/api/packages/${REPOSITORY_OWNER}/npm/"
-          npm config set "//trev.zip/api/packages/${REPOSITORY_OWNER}/npm/:_authToken=${PACKAGE_TOKEN}"
-          npm ci
-          npm publish --scope=@trev --registry="${SERVER_URL}/api/packages/${REPOSITORY_OWNER}/npm/"
+          TAG: ${{ github.ref_name }}
