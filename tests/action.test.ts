@@ -19,7 +19,6 @@ import {
   getCodexReleaseAssetUrl,
   getCodexExecutableNames,
   getCodexTargetTriple,
-  getCodexVersionFromPackageJson,
 } from "../src/codex/binary.ts";
 import {
   parseOptionalBoolean,
@@ -330,21 +329,6 @@ await test("creates GitHub App JWTs", () => {
       Buffer.from(signature, "base64url"),
     ),
     true,
-  );
-});
-
-await test("derives Codex version from package.json", () => {
-  assert.equal(
-    getCodexVersionFromPackageJson(
-      JSON.stringify({ dependencies: { "@openai/codex-sdk": "^0.143.0" } }),
-    ),
-    "0.143.0",
-  );
-  assert.equal(
-    getCodexVersionFromPackageJson(
-      JSON.stringify({ dependencies: { "@openai/codex-sdk": "~0.144.0-alpha.2" } }),
-    ),
-    "0.144.0-alpha.2",
   );
 });
 

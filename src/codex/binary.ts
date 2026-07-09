@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 import {
   findArchiveExecutable,
   resolveCachedExecutable,
@@ -7,12 +5,14 @@ import {
   type ToolArchiveExecutableSpec,
 } from "../tool-archive.ts";
 
+const CODEX_VERSION = "0.143.0";
+
 export async function resolveCodexExecutable(): Promise<string> {
   if (process.env.CODEX_PATH) {
     return process.env.CODEX_PATH;
   }
 
-  const version = getCodexPackageVersion();
+  const version = CODEX_VERSION;
   const target = getCodexTargetTriple();
 
   if (!target) {
@@ -23,31 +23,6 @@ export async function resolveCodexExecutable(): Promise<string> {
   const url = getCodexReleaseAssetUrl(version, target);
 
   return resolveCachedExecutable(asset, url);
-}
-
-export function getCodexVersionFromPackageJson(packageJsonText: string): string {
-  const packageJson = JSON.parse(packageJsonText) as {
-    dependencies?: Record<string, unknown>;
-  };
-  const versionRange = packageJson.dependencies?.["@openai/codex-sdk"];
-
-  if (typeof versionRange !== "string") {
-    throw new Error("package.json is missing dependencies.@openai/codex-sdk");
-  }
-
-  const match = versionRange.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/);
-
-  if (!match) {
-    throw new Error(`Could not derive Codex version from @openai/codex-sdk range ${versionRange}`);
-  }
-
-  return match[0];
-}
-
-function getCodexPackageVersion(): string {
-  return getCodexVersionFromPackageJson(
-    readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-  );
 }
 
 export function getCodexTargetTriple(
