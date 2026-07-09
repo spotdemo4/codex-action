@@ -42,4 +42,5 @@ jobs:
           auth: ${{ secrets.CODEX_ACTION_AUTH }}
           token: ${{ secrets.CODEX_TOKEN }}
           model: gpt-5.3-codex-spark
-          prompt: Hello
+          dry-run: true
+          prompt: Create or update .codex-action-check.txt with a single line saying "codex-action dry-run check".
