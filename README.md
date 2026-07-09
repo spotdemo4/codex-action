@@ -59,8 +59,9 @@ release binary with `@actions/tool-cache`:
 
 - `github-mcp-server` from `github/github-mcp-server` on GitHub, with the
   `repos`, `issues`, `pull_requests`, and `actions` toolsets in read-only mode.
-- `forgejo-mcp` from `goern/forgejo-mcp` on Gitea or Forgejo, pointed at the
-  current server URL.
+- `gitea-mcp` from `gitea/gitea-mcp` on Gitea, pointed at the current server URL.
+- `forgejo-mcp` from `goern/forgejo-mcp` on Forgejo, pointed at the current
+  server URL.
 
 The API token is forwarded through environment variables and is not written to
 Codex MCP configuration. On GitHub App setups, the installation must include the

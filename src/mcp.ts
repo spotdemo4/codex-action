@@ -8,6 +8,7 @@ import * as toolCache from "@actions/tool-cache";
 import type { Platform } from "./types.ts";
 
 const GITHUB_MCP_VERSION = "1.5.0";
+const GITEA_MCP_VERSION = "1.3.0";
 const FORGEJO_MCP_VERSION = "2.30.1";
 const GITHUB_MCP_TOOLSETS = "repos,issues,pull_requests,actions";
 
@@ -98,6 +99,16 @@ export function createMcpServerConfig(
     };
   }
 
+  if (platform === "gitea") {
+    return {
+      name: "gitea",
+      command: executable,
+      tokenEnvVar: "GITEA_ACCESS_TOKEN",
+      args: ["-t", "stdio", "--host", serverUrl],
+      env: {},
+    };
+  }
+
   return {
     name: "forgejo",
     command: executable,
@@ -114,9 +125,15 @@ export function getMcpReleaseAsset(
   nodePlatform: NodeJS.Platform = process.platform,
   arch: string = process.arch,
 ): McpReleaseAsset {
-  return platform === "github"
-    ? getGitHubMcpReleaseAsset(nodePlatform, arch)
-    : getForgejoMcpReleaseAsset(nodePlatform, arch);
+  if (platform === "github") {
+    return getGitHubMcpReleaseAsset(nodePlatform, arch);
+  }
+
+  if (platform === "gitea") {
+    return getGiteaMcpReleaseAsset(nodePlatform, arch);
+  }
+
+  return getForgejoMcpReleaseAsset(nodePlatform, arch);
 }
 
 export function getMcpReleaseAssetUrl(
@@ -128,6 +145,10 @@ export function getMcpReleaseAssetUrl(
 
   if (asset.cacheName === "github-mcp-server") {
     return `https://github.com/github/github-mcp-server/releases/download/v${asset.version}/${asset.assetName}`;
+  }
+
+  if (asset.cacheName === "gitea-mcp") {
+    return `https://gitea.com/gitea/gitea-mcp/releases/download/v${asset.version}/${asset.assetName}`;
   }
 
   return `https://codeberg.org/goern/forgejo-mcp/releases/download/v${asset.version}/${asset.assetName}`;
@@ -180,6 +201,27 @@ function getGitHubMcpReleaseAsset(nodePlatform: NodeJS.Platform, arch: string): 
     assetName: `github-mcp-server_${os}_${releaseArch}.${extension}`,
     format,
     executableNames: nodePlatform === "win32" ? ["github-mcp-server.exe"] : ["github-mcp-server"],
+  };
+}
+
+function getGiteaMcpReleaseAsset(nodePlatform: NodeJS.Platform, arch: string): McpReleaseAsset {
+  const os = getGitHubMcpOs(nodePlatform);
+  const releaseArch = getGitHubMcpArch(arch);
+
+  if (!os || !releaseArch) {
+    throw new Error(`Unsupported Gitea MCP platform: ${nodePlatform} (${arch})`);
+  }
+
+  const format = nodePlatform === "win32" ? "zip" : "tar";
+  const extension = format === "zip" ? "zip" : "tar.gz";
+
+  return {
+    cacheName: "gitea-mcp",
+    version: GITEA_MCP_VERSION,
+    target: `${os}-${releaseArch}`,
+    assetName: `gitea-mcp_${os}_${releaseArch}.${extension}`,
+    format,
+    executableNames: nodePlatform === "win32" ? ["gitea-mcp.exe"] : ["gitea-mcp"],
   };
 }
 
@@ -256,6 +298,10 @@ function getForgejoMcpArch(arch: string): string | null {
 function getMcpExecutableOverride(platform: Platform): string | undefined {
   if (platform === "github") {
     return process.env.GITHUB_MCP_SERVER_PATH;
+  }
+
+  if (platform === "gitea") {
+    return process.env.GITEA_MCP_PATH;
   }
 
   return process.env.FORGEJO_MCP_PATH;

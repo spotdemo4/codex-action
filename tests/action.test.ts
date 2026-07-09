@@ -238,6 +238,18 @@ await test("builds Forgejo MCP config without embedding the token", () => {
   assert.doesNotMatch(config, /secret-token/);
 });
 
+await test("builds Gitea MCP config without embedding the token", () => {
+  const server = createMcpServerConfig("gitea", "/tools/gitea-mcp", "https://gitea.com");
+  const config = buildCodexMcpConfig(server);
+
+  assert.match(config, /\[mcp_servers\.gitea\]/);
+  assert.match(config, /command = "\/tools\/gitea-mcp"/);
+  assert.match(config, /-t/);
+  assert.match(config, /https:\/\/gitea\.com/);
+  assert.match(config, /env_vars = \["GITEA_ACCESS_TOKEN"\]/);
+  assert.doesNotMatch(config, /secret-token/);
+});
+
 await test("maps platforms to GitHub MCP release assets", () => {
   assert.deepEqual(getMcpReleaseAsset("github", "linux", "x64"), {
     cacheName: "github-mcp-server",
@@ -254,6 +266,22 @@ await test("maps platforms to GitHub MCP release assets", () => {
   );
 });
 
+await test("maps platforms to Gitea MCP release assets", () => {
+  assert.deepEqual(getMcpReleaseAsset("gitea", "linux", "x64"), {
+    cacheName: "gitea-mcp",
+    version: "1.3.0",
+    target: "Linux-x86_64",
+    assetName: "gitea-mcp_Linux_x86_64.tar.gz",
+    format: "tar",
+    executableNames: ["gitea-mcp"],
+  });
+
+  assert.equal(
+    getMcpReleaseAssetUrl("gitea", "win32", "arm64"),
+    "https://gitea.com/gitea/gitea-mcp/releases/download/v1.3.0/gitea-mcp_Windows_arm64.zip",
+  );
+});
+
 await test("maps platforms to Forgejo MCP release assets", () => {
   assert.deepEqual(getMcpReleaseAsset("forgejo", "darwin", "arm64"), {
     cacheName: "forgejo-mcp",
@@ -265,7 +293,7 @@ await test("maps platforms to Forgejo MCP release assets", () => {
   });
 
   assert.equal(
-    getMcpReleaseAssetUrl("gitea", "linux", "x64"),
+    getMcpReleaseAssetUrl("forgejo", "linux", "x64"),
     "https://codeberg.org/goern/forgejo-mcp/releases/download/v2.30.1/forgejo-mcp_2.30.1_linux_amd64.tar.gz",
   );
   assert.throws(() => getMcpReleaseAsset("forgejo", "win32", "x64"), /Unsupported Forgejo/);
