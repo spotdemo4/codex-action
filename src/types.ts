@@ -9,6 +9,7 @@ export type ActionInputs = {
   githubAppClientId: string | undefined;
   githubAppPrivateKey: string | undefined;
   automerge: boolean | undefined;
+  dryRun: boolean;
 };
 
 export type ActionUser = {

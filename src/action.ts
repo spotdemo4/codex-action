@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 
 import { resolveCodexExecutable } from "./codex-binary.ts";
 import { createCodexHome, ensureCodexAuth, persistCodexAuth, runCodexPrompt } from "./codex.ts";
-import { commitAndPushChanges, configureGitUser, hasGitChanges } from "./git.ts";
+import { commitChanges, configureGitUser, hasGitChanges, pushChanges } from "./git.ts";
 import { readInputs, resolvePromptInput } from "./inputs.ts";
 import { setupCodexMcp } from "./mcp.ts";
 import { createPlatformClient, isPullRequestEvent } from "./platform.ts";
@@ -45,24 +45,35 @@ export async function run(): Promise<void> {
       codexEnv,
     );
 
+    const pullRequestEvent = isPullRequestEvent();
+    const prComment = metadata.prComment.trim();
+
     if (await hasGitChanges(workspace)) {
-      await commitAndPushChanges(
-        workspace,
-        platformClient.type,
-        user,
-        platformClient.token,
-        metadata.commitMessage,
-      );
+      await commitChanges(workspace, metadata.commitMessage);
+
+      if (inputs.dryRun) {
+        core.info("Dry run enabled; skipping push of Codex changes.");
+      } else {
+        await pushChanges(workspace, platformClient.type, user, platformClient.token);
+      }
     } else {
       core.info("Codex did not leave repository changes to commit.");
     }
 
-    if (isPullRequestEvent() && metadata.prComment.trim()) {
-      await platformClient.postPullRequestComment(metadata.prComment.trim());
+    if (pullRequestEvent && prComment) {
+      if (inputs.dryRun) {
+        core.info("Dry run enabled; skipping Codex pull request comment.");
+      } else {
+        await platformClient.postPullRequestComment(prComment);
+      }
     }
 
-    if (isPullRequestEvent() && inputs.automerge !== undefined) {
-      await platformClient.setPullRequestAutomerge(inputs.automerge);
+    if (pullRequestEvent && inputs.automerge !== undefined) {
+      if (inputs.dryRun) {
+        core.info("Dry run enabled; skipping pull request automerge update.");
+      } else {
+        await platformClient.setPullRequestAutomerge(inputs.automerge);
+      }
     }
   } finally {
     currentAuth = (await persistCodexAuth(codexHome, currentAuth, updateAuthSecret)) ?? currentAuth;

@@ -28,6 +28,10 @@ inputs:
   automerge:
     description: Set true to enable automerge, false to disable automerge, or omit for no-op
     required: false
+  dry-run:
+    description: Commit local changes but skip pushing, pull request comments, and automerge
+    required: false
+    default: "false"
 
 runs:
   using: node24

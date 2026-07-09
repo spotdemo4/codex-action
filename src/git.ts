@@ -15,22 +15,25 @@ export async function hasGitChanges(workspace: string): Promise<boolean> {
   return stdout.trim().length > 0;
 }
 
-export async function commitAndPushChanges(
-  workspace: string,
-  platform: Platform,
-  user: ActionUser,
-  token: string,
-  commitMessage: string,
-): Promise<void> {
+export async function commitChanges(workspace: string, commitMessage: string): Promise<void> {
   const message = commitMessage || "Update with Codex";
 
   await runCapturedProcess("git", ["add", "-A"], { cwd: workspace });
   await runCapturedProcess("git", ["commit", "-m", message], { cwd: workspace });
+  core.info("Committed Codex changes.");
+}
+
+export async function pushChanges(
+  workspace: string,
+  platform: Platform,
+  user: ActionUser,
+  token: string,
+): Promise<void> {
   await withAuthenticatedOrigin(workspace, platform, user, token, async () => {
     const pushRef = await resolvePushRef(workspace);
     await runCapturedProcess("git", ["push", "origin", `HEAD:${pushRef}`], { cwd: workspace });
   });
-  core.info("Committed and pushed Codex changes.");
+  core.info("Pushed Codex changes.");
 }
 
 async function resolvePushRef(workspace: string): Promise<string> {

@@ -99,6 +99,10 @@ Effective prompts usually include:
 Do not ask Codex to commit, push, or post comments directly. This action handles
 commits, pushes, pull request comments, and automerge after Codex finishes.
 
+Set `dry-run: true` to let Codex run and create a local commit while skipping
+pushes, pull request comments, and automerge updates. Refreshed Codex auth is
+still saved to the configured repository secret.
+
 Codex runs with workspace write access and without shell network access. The
 configured MCP server can access the platform API with the action token.
 

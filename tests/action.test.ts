@@ -55,8 +55,9 @@ await test("validates auth secret names", () => {
 await test("parses optional boolean inputs", () => {
   assert.equal(parseOptionalBoolean("", "automerge"), undefined);
   assert.equal(parseOptionalBoolean("true", "automerge"), true);
+  assert.equal(parseOptionalBoolean("yes", "dry-run"), true);
   assert.equal(parseOptionalBoolean("OFF", "automerge"), false);
-  assert.throws(() => parseOptionalBoolean("maybe", "automerge"), /automerge/);
+  assert.throws(() => parseOptionalBoolean("maybe", "dry-run"), /dry-run/);
 });
 
 await test("parses optional string inputs", () => {
