@@ -7,7 +7,7 @@
   "platform": "forgejo",
   "endpoint": "https://trev.zip/api/v1",
   "repositories": ["llc/codex-action"],
-  "allowedCommands": ["npm audit fix"],
+  "allowedCommands": ["npm audit fix", "npm run build"],
 
   // repository
   "extends": ["config:recommended"],
@@ -42,6 +42,14 @@
       "rangeStrategy": "bump",
       "addLabels": ["node"],
       "postUpdateOptions": ["npmInstallTwice"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "postUpgradeTasks": {
+        "commands": ["npm run build"],
+        "fileFilters": ["build/index.js"]
+      }
     },
     {
       "matchManagers": ["npm"],
