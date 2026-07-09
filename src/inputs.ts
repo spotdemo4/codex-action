@@ -12,14 +12,24 @@ export function readInputs(): ActionInputs {
   const authSecret = validateSecretName(core.getInput("auth-secret") || DEFAULT_AUTH_SECRET);
   const prompt = core.getInput("prompt", { required: true });
   const model = parseOptionalString(core.getInput("model"));
-  const token = core.getInput("token", { required: true });
+  const token = parseOptionalString(core.getInput("token"));
+  const githubAppClientId = parseOptionalString(core.getInput("client-id"));
+  const githubAppPrivateKey = parseOptionalString(core.getInput("private-key"));
   const automerge = parseOptionalBoolean(core.getInput("automerge"));
+
+  validateActionAuthentication(token, githubAppClientId, githubAppPrivateKey);
 
   if (auth) {
     core.setSecret(auth);
   }
 
-  core.setSecret(token);
+  if (token) {
+    core.setSecret(token);
+  }
+
+  if (githubAppPrivateKey) {
+    core.setSecret(githubAppPrivateKey);
+  }
 
   return {
     auth,
@@ -27,8 +37,30 @@ export function readInputs(): ActionInputs {
     prompt,
     model,
     token,
+    githubAppClientId,
+    githubAppPrivateKey,
     automerge,
   };
+}
+
+export function validateActionAuthentication(
+  token: string | undefined,
+  githubAppClientId: string | undefined,
+  githubAppPrivateKey: string | undefined,
+): void {
+  const hasGitHubAppCredentials = Boolean(githubAppClientId || githubAppPrivateKey);
+
+  if (token && hasGitHubAppCredentials) {
+    throw new Error("provide either token or client-id/private-key, not both");
+  }
+
+  if (!token && !hasGitHubAppCredentials) {
+    throw new Error("token is required unless client-id and private-key are provided");
+  }
+
+  if (hasGitHubAppCredentials && (!githubAppClientId || !githubAppPrivateKey)) {
+    throw new Error("client-id and private-key must be provided together");
+  }
 }
 
 export function parseOptionalString(value: string): string | undefined {

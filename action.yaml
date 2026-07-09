@@ -18,7 +18,13 @@ inputs:
     required: false
   token:
     description: GitHub, Gitea, or Forgejo token used for git and pull request APIs
-    required: true
+    required: false
+  client-id:
+    description: GitHub App client ID used to create an installation token when token is omitted
+    required: false
+  private-key:
+    description: GitHub App private key used to create an installation token when token is omitted
+    required: false
   automerge:
     description: Set true to enable automerge, false to disable automerge, or omit for no-op
     required: false

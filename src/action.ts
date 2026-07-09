@@ -9,7 +9,11 @@ import { createPlatformClient, isPullRequestEvent } from "./platform.ts";
 export async function run(): Promise<void> {
   const inputs = readInputs();
   const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
-  const platformClient = createPlatformClient(inputs.token);
+  const platformClient = await createPlatformClient({
+    token: inputs.token,
+    githubAppClientId: inputs.githubAppClientId,
+    githubAppPrivateKey: inputs.githubAppPrivateKey,
+  });
   const codexHome = createCodexHome();
   const codexExecutable = await resolveCodexExecutable();
   const updateAuthSecret = (value: string) =>
@@ -43,7 +47,7 @@ export async function run(): Promise<void> {
         workspace,
         platformClient.type,
         user,
-        inputs.token,
+        platformClient.token,
         metadata.commitMessage,
       );
     } else {

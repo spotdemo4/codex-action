@@ -1,3 +1,5 @@
+import { createSign } from "node:crypto";
+
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import sodium from "libsodium-wrappers";
@@ -10,6 +12,24 @@ import type {
   PullRequestPayload,
 } from "./types.ts";
 import { errorMessage } from "./utils.ts";
+
+export const GITHUB_APP_INSTALLATION_PERMISSIONS = {
+  contents: "write",
+  issues: "write",
+  pull_requests: "write",
+  secrets: "write",
+} as const;
+
+type PlatformClientOptions = {
+  token: string | undefined;
+  githubAppClientId: string | undefined;
+  githubAppPrivateKey: string | undefined;
+};
+
+type GitHubAppInstallationAuthentication = {
+  token: string;
+  appSlug: string;
+};
 
 class HttpError extends Error {
   status: number;
@@ -33,14 +53,37 @@ export function detectPlatform(env: NodeJS.ProcessEnv = process.env): Platform {
   return "github";
 }
 
-export function createPlatformClient(token: string): PlatformClient {
+export async function createPlatformClient(
+  options: PlatformClientOptions,
+): Promise<PlatformClient> {
   const platform = detectPlatform();
 
   if (platform === "github") {
-    return new GitHubPlatformClient(token);
+    if (options.githubAppClientId && options.githubAppPrivateKey) {
+      const auth = await createGitHubAppInstallationAuthentication(
+        options.githubAppClientId,
+        options.githubAppPrivateKey,
+      );
+
+      return new GitHubPlatformClient(auth.token, auth.appSlug);
+    }
+
+    if (!options.token) {
+      throw new Error("token is required for GitHub unless client-id and private-key are provided");
+    }
+
+    return new GitHubPlatformClient(options.token);
   }
 
-  return new ForgejoPlatformClient(platform, token);
+  if (options.githubAppClientId || options.githubAppPrivateKey) {
+    throw new Error("client-id and private-key are only supported on GitHub");
+  }
+
+  if (!options.token) {
+    throw new Error("token is required for Gitea and Forgejo");
+  }
+
+  return new ForgejoPlatformClient(platform, options.token);
 }
 
 export function isPullRequestEvent(): boolean {
@@ -49,19 +92,48 @@ export function isPullRequestEvent(): boolean {
 
 class GitHubPlatformClient implements PlatformClient {
   readonly type = "github";
+  readonly token: string;
+  private readonly appSlug: string | undefined;
   private readonly octokit: ReturnType<typeof github.getOctokit>;
 
-  constructor(token: string) {
+  constructor(token: string, appSlug?: string) {
+    this.token = token;
+    this.appSlug = appSlug;
     this.octokit = github.getOctokit(token);
   }
 
   async getActionUser(): Promise<ActionUser> {
-    const { data } = await this.octokit.rest.users.getAuthenticated();
+    if (this.appSlug) {
+      return this.getGitHubAppBotUser(this.appSlug);
+    }
+
+    try {
+      const { data } = await this.octokit.rest.users.getAuthenticated();
+
+      return {
+        login: data.login,
+        id: data.id,
+        email: data.email ?? `${data.id}+${data.login}@users.noreply.github.com`,
+      };
+    } catch (error) {
+      if (!isGitHubAppInstallationUserError(error)) {
+        throw error;
+      }
+
+      core.info("GitHub installation token cannot read /user; using github-actions[bot].");
+      return getGitHubActionsBotUser();
+    }
+  }
+
+  private async getGitHubAppBotUser(appSlug: string): Promise<ActionUser> {
+    const { data } = await this.octokit.rest.users.getByUsername({
+      username: getGitHubAppBotLogin(appSlug),
+    });
 
     return {
       login: data.login,
       id: data.id,
-      email: data.email ?? `${data.id}+${data.login}@users.noreply.github.com`,
+      email: buildGitHubNoreplyEmail(data.id, data.login),
     };
   }
 
@@ -136,7 +208,7 @@ class GitHubPlatformClient implements PlatformClient {
 
 class ForgejoPlatformClient implements PlatformClient {
   readonly type: "gitea" | "forgejo";
-  private readonly token: string;
+  readonly token: string;
 
   constructor(type: "gitea" | "forgejo", token: string) {
     this.type = type;
@@ -208,11 +280,109 @@ class ForgejoPlatformClient implements PlatformClient {
   }
 }
 
+export function getGitHubActionsBotUser(): ActionUser {
+  const login = "github-actions[bot]";
+  const id = 41898282;
+
+  return {
+    login,
+    id,
+    email: buildGitHubNoreplyEmail(id, login),
+  };
+}
+
+export function getGitHubAppBotLogin(appSlug: string): string {
+  return `${appSlug}[bot]`;
+}
+
+export function buildGitHubNoreplyEmail(id: number | string, login: string): string {
+  return `${id}+${login}@users.noreply.github.com`;
+}
+
+export function createGitHubAppJwt(
+  clientId: string,
+  privateKey: string,
+  nowMs = Date.now(),
+): string {
+  const nowSeconds = Math.floor(nowMs / 1000);
+  const header = base64UrlJson({ alg: "RS256", typ: "JWT" });
+  const payload = base64UrlJson({
+    iat: nowSeconds - 60,
+    exp: nowSeconds + 9 * 60,
+    iss: clientId,
+  });
+  const signingInput = `${header}.${payload}`;
+  const signature = createSign("RSA-SHA256")
+    .update(signingInput)
+    .end()
+    .sign(normalizePrivateKey(privateKey), "base64url");
+
+  return `${signingInput}.${signature}`;
+}
+
+export function normalizePrivateKey(privateKey: string): string {
+  return privateKey.replace(/\\n/g, "\n");
+}
+
+export function isGitHubAppInstallationUserError(error: unknown): boolean {
+  if (error === null || typeof error !== "object" || Array.isArray(error)) {
+    return false;
+  }
+
+  const status = (error as { status?: unknown }).status;
+  const message = (error as { message?: unknown }).message;
+
+  return (
+    status === 403 &&
+    typeof message === "string" &&
+    message.includes("Resource not accessible by integration")
+  );
+}
+
 async function encryptGithubSecret(value: string, publicKey: string): Promise<string> {
   await sodium.ready;
   const binaryPublicKey = sodium.from_base64(publicKey, sodium.base64_variants.ORIGINAL);
   const encryptedBytes = sodium.crypto_box_seal(value, binaryPublicKey);
   return sodium.to_base64(encryptedBytes, sodium.base64_variants.ORIGINAL);
+}
+
+async function createGitHubAppInstallationAuthentication(
+  clientId: string,
+  privateKey: string,
+): Promise<GitHubAppInstallationAuthentication> {
+  core.setSecret(normalizePrivateKey(privateKey));
+  const jwt = createGitHubAppJwt(clientId, privateKey);
+  core.setSecret(jwt);
+
+  const appOctokit = github.getOctokit(jwt);
+  const [{ data: app }, { data: installation }] = await Promise.all([
+    appOctokit.rest.apps.getAuthenticated(),
+    appOctokit.rest.apps.getRepoInstallation(github.context.repo),
+  ]);
+
+  if (!app?.slug) {
+    throw new Error("GitHub App response did not include a slug");
+  }
+  const appSlug = app.slug;
+
+  const { data: installationAccessToken } =
+    await appOctokit.rest.apps.createInstallationAccessToken({
+      installation_id: installation.id,
+      repositories: [github.context.repo.repo],
+      permissions: GITHUB_APP_INSTALLATION_PERMISSIONS,
+    });
+
+  core.setSecret(installationAccessToken.token);
+  core.info(`Created GitHub App installation token for ${appSlug}.`);
+
+  return {
+    token: installationAccessToken.token,
+    appSlug,
+  };
+}
+
+function base64UrlJson(value: unknown): string {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
 }
 
 async function forgejoRequest<T = unknown>(

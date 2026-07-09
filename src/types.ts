@@ -5,7 +5,9 @@ export type ActionInputs = {
   authSecret: string;
   prompt: string;
   model: string | undefined;
-  token: string;
+  token: string | undefined;
+  githubAppClientId: string | undefined;
+  githubAppPrivateKey: string | undefined;
   automerge: boolean | undefined;
 };
 
@@ -17,6 +19,7 @@ export type ActionUser = {
 
 export type PlatformClient = {
   type: Platform;
+  token: string;
   getActionUser(): Promise<ActionUser>;
   postPullRequestComment(body: string): Promise<void>;
   setPullRequestAutomerge(enabled: boolean): Promise<void>;

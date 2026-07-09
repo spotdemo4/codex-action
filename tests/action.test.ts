@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync, verify as verifySignature } from "node:crypto";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -24,9 +25,19 @@ import {
   parseOptionalBoolean,
   parseOptionalString,
   resolvePromptInput,
+  validateActionAuthentication,
   validateSecretName,
 } from "../src/inputs.ts";
-import { detectPlatform } from "../src/platform.ts";
+import {
+  buildGitHubNoreplyEmail,
+  createGitHubAppJwt,
+  detectPlatform,
+  getGitHubAppBotLogin,
+  getGitHubActionsBotUser,
+  GITHUB_APP_INSTALLATION_PERMISSIONS,
+  isGitHubAppInstallationUserError,
+  normalizePrivateKey,
+} from "../src/platform.ts";
 
 await test("validates auth secret names", () => {
   assert.equal(validateSecretName("CODEX_ACTION_AUTH"), "CODEX_ACTION_AUTH");
@@ -45,6 +56,14 @@ await test("parses optional boolean inputs", () => {
 await test("parses optional string inputs", () => {
   assert.equal(parseOptionalString(""), undefined);
   assert.equal(parseOptionalString("  gpt-5.1-codex-max  "), "gpt-5.1-codex-max");
+});
+
+await test("validates action authentication inputs", () => {
+  assert.doesNotThrow(() => validateActionAuthentication("token", undefined, undefined));
+  assert.doesNotThrow(() => validateActionAuthentication(undefined, "client", "key"));
+  assert.throws(() => validateActionAuthentication(undefined, undefined, undefined), /token/);
+  assert.throws(() => validateActionAuthentication("token", "client", "key"), /either token/);
+  assert.throws(() => validateActionAuthentication(undefined, "client", undefined), /together/);
 });
 
 await test("encodes and decodes auth secret values", () => {
@@ -145,6 +164,79 @@ await test("detects action platform", () => {
   assert.equal(detectPlatform({}), "github");
   assert.equal(detectPlatform({ GITEA_ACTIONS: "true" }), "gitea");
   assert.equal(detectPlatform({ FORGEJO_ACTIONS: "true" }), "forgejo");
+});
+
+await test("detects GitHub App installation /user errors", () => {
+  assert.equal(
+    isGitHubAppInstallationUserError({
+      status: 403,
+      message: "Resource not accessible by integration",
+    }),
+    true,
+  );
+  assert.equal(
+    isGitHubAppInstallationUserError({ status: 401, message: "Bad credentials" }),
+    false,
+  );
+});
+
+await test("builds GitHub Actions bot user", () => {
+  assert.deepEqual(getGitHubActionsBotUser(), {
+    login: "github-actions[bot]",
+    id: 41898282,
+    email: "41898282+github-actions[bot]@users.noreply.github.com",
+  });
+});
+
+await test("builds GitHub App bot identity values", () => {
+  assert.equal(getGitHubAppBotLogin("my-app"), "my-app[bot]");
+  assert.equal(
+    buildGitHubNoreplyEmail(123, "my-app[bot]"),
+    "123+my-app[bot]@users.noreply.github.com",
+  );
+});
+
+await test("defines GitHub App installation token permissions", () => {
+  assert.deepEqual(GITHUB_APP_INSTALLATION_PERMISSIONS, {
+    contents: "write",
+    issues: "write",
+    pull_requests: "write",
+    secrets: "write",
+  });
+});
+
+await test("creates GitHub App JWTs", () => {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+  const jwt = createGitHubAppJwt(
+    "Iv1.client",
+    privateKeyPem.replace(/\n/g, "\\n"),
+    1_700_000_000_000,
+  );
+  const [header, payload, signature] = jwt.split(".");
+
+  assert.ok(header);
+  assert.ok(payload);
+  assert.ok(signature);
+  assert.deepEqual(JSON.parse(Buffer.from(header, "base64url").toString("utf8")), {
+    alg: "RS256",
+    typ: "JWT",
+  });
+  assert.deepEqual(JSON.parse(Buffer.from(payload, "base64url").toString("utf8")), {
+    iat: 1_699_999_940,
+    exp: 1_700_000_540,
+    iss: "Iv1.client",
+  });
+  assert.equal(normalizePrivateKey(privateKeyPem.replace(/\n/g, "\\n")), privateKeyPem);
+  assert.equal(
+    verifySignature(
+      "RSA-SHA256",
+      Buffer.from(`${header}.${payload}`),
+      publicKey,
+      Buffer.from(signature, "base64url"),
+    ),
+    true,
+  );
 });
 
 await test("derives Codex version from package.json", () => {

@@ -35,19 +35,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - id: app
-        name: Create app token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ vars.CLIENT_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-          permission-contents: write
-          permission-secrets: write
-
       - name: Run action
         uses: ./. # zizmor: ignore[unpinned-uses]
         with:
           auth: ${{ secrets.CODEX_ACTION_AUTH }}
-          token: ${{ steps.app.outputs.token }}
+          client-id: ${{ vars.CLIENT_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
           model: gpt-5.3-codex-spark
           prompt: Hello
