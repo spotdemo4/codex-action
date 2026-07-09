@@ -20,6 +20,7 @@ import type { CodexRunMetadata } from "./types.ts";
 import { errorMessage } from "./utils.ts";
 
 const CODEX_APP_SERVER_TIMEOUT_MS = 30_000;
+const CODEX_AUTH_REFRESH_SKEW_MS = 10 * 60 * 1000;
 
 const CODEX_OUTPUT_SCHEMA = {
   type: "object",
@@ -77,16 +78,22 @@ export async function ensureCodexAuth(
     await runCodexDeviceLogin(codexExecutable, codexHome, workspace);
   }
 
-  try {
-    await refreshCodexAuth(codexExecutable, codexHome, workspace);
-  } catch (error) {
-    if (!loadedAuthFromSecret) {
-      throw error;
-    }
+  const authJson = formatCodexAuthJson(readCodexAuthJson(codexHome));
 
-    core.warning(`Stored Codex auth could not be refreshed: ${errorMessage(error)}`);
-    await runCodexDeviceLogin(codexExecutable, codexHome, workspace);
-    await refreshCodexAuth(codexExecutable, codexHome, workspace);
+  if (codexAuthNeedsRefresh(authJson)) {
+    try {
+      await refreshCodexAuth(codexExecutable, codexHome, workspace);
+    } catch (error) {
+      if (!loadedAuthFromSecret) {
+        throw error;
+      }
+
+      core.warning(`Stored Codex auth could not be refreshed: ${errorMessage(error)}`);
+      await runCodexDeviceLogin(codexExecutable, codexHome, workspace);
+      await refreshCodexAuth(codexExecutable, codexHome, workspace);
+    }
+  } else {
+    core.info("Codex auth token is still fresh; refresh skipped.");
   }
 
   return persistCodexAuth(codexHome, auth, updateAuthSecret, { required: true });
@@ -202,6 +209,66 @@ export function isCodexAccountReadAuthenticated(result: unknown): boolean {
 
   const account = (result as { account?: unknown }).account;
   return account !== null && typeof account === "object" && !Array.isArray(account);
+}
+
+export function codexAuthNeedsRefresh(authJson: string, nowMs: number = Date.now()): boolean {
+  const accessToken = getCodexAccessToken(authJson);
+
+  if (!accessToken) {
+    return true;
+  }
+
+  const expiresAtMs = getJwtExpirationMs(accessToken);
+
+  if (expiresAtMs === undefined) {
+    return true;
+  }
+
+  return expiresAtMs - nowMs <= CODEX_AUTH_REFRESH_SKEW_MS;
+}
+
+function getCodexAccessToken(authJson: string): string | undefined {
+  try {
+    const parsed = JSON.parse(authJson) as {
+      tokens?: Partial<Record<"access_token", unknown>>;
+    };
+    const accessToken = parsed.tokens?.access_token;
+    return typeof accessToken === "string" && accessToken ? accessToken : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getJwtExpirationMs(token: string): number | undefined {
+  const payload = parseJwtPayload(token);
+
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+    return undefined;
+  }
+
+  const exp = (payload as { exp?: unknown }).exp;
+
+  if (typeof exp !== "number" || !Number.isFinite(exp)) {
+    return undefined;
+  }
+
+  return exp * 1000;
+}
+
+function parseJwtPayload(token: string): unknown {
+  const payload = token.split(".")[1];
+
+  if (!payload) {
+    return undefined;
+  }
+
+  try {
+    const base64 = payload.replaceAll("-", "+").replaceAll("_", "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 async function runCodexDeviceLogin(

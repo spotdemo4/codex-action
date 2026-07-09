@@ -13,6 +13,7 @@ import {
   getCodexVersionFromPackageJson,
 } from "../src/codex-binary.ts";
 import {
+  codexAuthNeedsRefresh,
   decodeAuthSecret,
   encodeAuthSecret,
   formatCodexAuthJson,
@@ -71,6 +72,26 @@ await test("detects authenticated Codex account/read responses", () => {
     true,
   );
   assert.equal(isCodexAccountReadAuthenticated({ account: null, requiresOpenaiAuth: true }), false);
+});
+
+await test("detects when Codex auth needs refresh", () => {
+  const nowMs = 1_700_000_000_000;
+  const authJson = (accessToken: string) =>
+    JSON.stringify({ tokens: { access_token: accessToken } });
+
+  assert.equal(
+    codexAuthNeedsRefresh(authJson(createJwt(Math.floor((nowMs + 20 * 60 * 1000) / 1000))), nowMs),
+    false,
+  );
+  assert.equal(
+    codexAuthNeedsRefresh(authJson(createJwt(Math.floor((nowMs + 5 * 60 * 1000) / 1000))), nowMs),
+    true,
+  );
+  assert.equal(
+    codexAuthNeedsRefresh(authJson(createJwt(Math.floor((nowMs - 1000) / 1000))), nowMs),
+    true,
+  );
+  assert.equal(codexAuthNeedsRefresh(authJson("not-a-jwt"), nowMs), true);
 });
 
 await test("skips auth secret updates when auth is unchanged", async () => {
@@ -170,3 +191,8 @@ await test("finds target-named Codex release executables", () => {
   ]);
   assert.equal(findCodexExecutable(directory, "x86_64-unknown-linux-musl", "linux"), executable);
 });
+
+function createJwt(exp: number): string {
+  const payload = Buffer.from(JSON.stringify({ exp }), "utf8").toString("base64url");
+  return `header.${payload}.signature`;
+}
