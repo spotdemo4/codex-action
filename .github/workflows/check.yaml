@@ -43,4 +43,22 @@ jobs:
           private-key: ${{ secrets.PRIVATE_KEY }}
           model: gpt-5.3-codex-spark
           dry-run: true
-          prompt: Create or update .codex-action-check.txt with a single line saying "codex-action dry-run check".
+          prompt: |
+            You must modify the working tree as the only task.
+            Create or overwrite `.codex-action-check.txt` with exactly this single line:
+            codex-action dry-run check
+            Do not finish until the file exists and `git status --porcelain` shows it as changed.
+
+      - name: Verify dry-run change
+        run: |
+          test -f .codex-action-check.txt
+          grep -qxF "codex-action dry-run check" .codex-action-check.txt
+          if git diff --quiet HEAD^ HEAD -- .codex-action-check.txt; then
+            echo ".codex-action-check.txt was not changed by the local dry-run commit"
+            exit 1
+          else
+            status=$?
+            if [ "$status" -ne 1 ]; then
+              exit "$status"
+            fi
+          fi

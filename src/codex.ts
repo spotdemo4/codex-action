@@ -124,6 +124,7 @@ export async function runCodexPrompt(
   const turn = await thread.run(codexPrompt, {
     outputSchema: CODEX_OUTPUT_SCHEMA,
   });
+  logCodexActivity(turn.items);
   logCodexText("Codex response", turn.finalResponse);
 
   return parseCodexMetadata(turn.finalResponse);
@@ -575,6 +576,115 @@ function logCodexText(title: string, text: string): void {
   core.startGroup(title);
   core.info(text);
   core.endGroup();
+}
+
+function logCodexActivity(items: unknown[]): void {
+  const summaries = items
+    .map(formatCodexActivityItem)
+    .filter((value): value is string => value !== undefined);
+
+  if (summaries.length === 0) {
+    core.info("Codex reported no file changes, commands, MCP calls, web searches, or errors.");
+    return;
+  }
+
+  core.startGroup("Codex activity");
+  for (const summary of summaries) {
+    core.info(summary);
+  }
+  core.endGroup();
+}
+
+function formatCodexActivityItem(item: unknown): string | undefined {
+  if (!isRecord(item)) {
+    return undefined;
+  }
+
+  switch (item.type) {
+    case "file_change":
+      return formatCodexFileChangeItem(item);
+    case "command_execution":
+      return formatCodexCommandExecutionItem(item);
+    case "mcp_tool_call":
+      return formatCodexMcpToolCallItem(item);
+    case "web_search":
+      return `web_search: ${getString(item, "query") ?? "unknown query"}`;
+    case "todo_list":
+      return formatCodexTodoListItem(item);
+    case "error":
+      return `error: ${getString(item, "message") ?? "unknown error"}`;
+    default:
+      return undefined;
+  }
+}
+
+function formatCodexFileChangeItem(item: Record<string, unknown>): string {
+  const changes = Array.isArray(item.changes)
+    ? item.changes
+        .map((change) => {
+          if (!isRecord(change)) {
+            return undefined;
+          }
+
+          const kind = getString(change, "kind") ?? "change";
+          const filePath = getString(change, "path") ?? "unknown path";
+          return `${kind} ${filePath}`;
+        })
+        .filter((value): value is string => value !== undefined)
+        .join(", ")
+    : "";
+  const suffix = changes ? `: ${changes}` : "";
+  return `file_change ${getString(item, "status") ?? "unknown"}${suffix}`;
+}
+
+function formatCodexCommandExecutionItem(item: Record<string, unknown>): string {
+  const command = getString(item, "command") ?? "unknown command";
+  const exitCode = getNumber(item, "exit_code");
+  const exitSuffix = exitCode === undefined ? "" : ` exit ${exitCode}`;
+  const output = truncateLogText(getString(item, "aggregated_output")?.trim() ?? "");
+  const outputSuffix = output ? `\noutput: ${output}` : "";
+
+  return `command ${getString(item, "status") ?? "unknown"}${exitSuffix}: ${command}${outputSuffix}`;
+}
+
+function formatCodexMcpToolCallItem(item: Record<string, unknown>): string {
+  const server = getString(item, "server") ?? "unknown-server";
+  const tool = getString(item, "tool") ?? "unknown-tool";
+  const error = isRecord(item.error) ? getString(item.error, "message") : undefined;
+  const errorSuffix = error ? `: ${error}` : "";
+
+  return `mcp_tool_call ${getString(item, "status") ?? "unknown"}: ${server}/${tool}${errorSuffix}`;
+}
+
+function formatCodexTodoListItem(item: Record<string, unknown>): string {
+  const todos = Array.isArray(item.items) ? item.items.filter(isRecord) : [];
+  const completed = todos.filter((todo) => todo.completed === true).length;
+  const pending = todos.length - completed;
+  return `todo_list: ${completed} completed, ${pending} pending`;
+}
+
+function truncateLogText(value: string): string {
+  const singleLine = value.replace(/\s+/g, " ").trim();
+
+  if (singleLine.length <= 500) {
+    return singleLine;
+  }
+
+  return `${singleLine.slice(0, 497)}...`;
+}
+
+function getString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value ? value : undefined;
+}
+
+function getNumber(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function createCodexEnv(
