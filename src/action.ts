@@ -1,20 +1,21 @@
-import { spawn } from "node:child_process";
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
 import {
   chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import * as core from "@actions/core";
+import * as exec from "@actions/exec";
 import * as github from "@actions/github";
+import * as toolCache from "@actions/tool-cache";
 import { Codex } from "@openai/codex-sdk";
 import { createClient } from "@redis/client";
 
@@ -39,10 +40,7 @@ type ActionUser = {
   email: string;
 };
 
-type ProcessOptions = {
-  cwd?: string;
-  env?: Record<string, string>;
-};
+type ProcessOptions = exec.ExecOptions;
 
 type CodexRunMetadata = {
   commitMessage: string;
@@ -72,11 +70,8 @@ type GiteaUserResponse = {
   full_name?: string;
 };
 
-const require = createRequire(import.meta.url);
-
 const REDIS_AUTH_KEY = "codex-action:v1:auth";
 const ENCRYPTION_VERSION = 1;
-const CODEX_PACKAGE_VERSION = "0.143.0";
 
 const CODEX_OUTPUT_SCHEMA = {
   type: "object",
@@ -241,7 +236,7 @@ export async function run(): Promise<void> {
   const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
   const platform = detectPlatform();
   const codexHome = createCodexHome();
-  const codexExecutable = resolveCodexExecutable(codexHome);
+  const codexExecutable = await resolveCodexExecutable();
   const redis = createClient({ url: inputs.redis });
 
   redis.on("error", (error) => {
@@ -415,84 +410,95 @@ function createCodexHome(): string {
   return codexHome;
 }
 
-function resolveCodexExecutable(codexHome: string): string {
+async function resolveCodexExecutable(): Promise<string> {
   if (process.env.CODEX_PATH) {
     return process.env.CODEX_PATH;
   }
 
-  const nativeExecutable = findNativeCodexExecutable();
-
-  if (nativeExecutable) {
-    return nativeExecutable;
-  }
-
-  return writeNpxCodexWrapper(codexHome);
-}
-
-function findNativeCodexExecutable(): string | null {
+  const version = getCodexPackageVersion();
   const target = getCodexTargetTriple();
 
   if (!target) {
-    return null;
+    throw new Error(`Unsupported Codex platform: ${process.platform} (${process.arch})`);
   }
 
-  const platformPackageByTarget: Record<string, string> = {
-    "aarch64-apple-darwin": "@openai/codex-darwin-arm64",
-    "aarch64-pc-windows-msvc": "@openai/codex-win32-arm64",
-    "aarch64-unknown-linux-musl": "@openai/codex-linux-arm64",
-    "x86_64-apple-darwin": "@openai/codex-darwin-x64",
-    "x86_64-pc-windows-msvc": "@openai/codex-win32-x64",
-    "x86_64-unknown-linux-musl": "@openai/codex-linux-x64",
-  };
-  const platformPackage = platformPackageByTarget[target];
+  const cachedDirectory = toolCache.find("codex", version, target);
 
-  if (!platformPackage) {
-    return null;
+  if (cachedDirectory) {
+    core.info(`Using cached Codex ${version} for ${target}.`);
+    return findCodexExecutable(cachedDirectory);
   }
 
-  try {
-    const packageJsonPath = require.resolve(`${platformPackage}/package.json`);
-    const executable = path.join(
-      path.dirname(packageJsonPath),
-      "vendor",
-      target,
-      "bin",
-      process.platform === "win32" ? "codex.exe" : "codex",
-    );
+  const asset = getCodexReleaseAsset(target);
+  const url = getCodexReleaseAssetUrl(version, target);
+  core.info(`Downloading Codex ${version} for ${target}.`);
+  const archivePath = await toolCache.downloadTool(url);
+  const extractedDirectory =
+    asset.format === "zip"
+      ? await toolCache.extractZip(archivePath)
+      : await toolCache.extractTar(archivePath);
+  findCodexExecutable(extractedDirectory);
+  const cachedPath = await toolCache.cacheDir(extractedDirectory, "codex", version, target);
 
-    return existsSync(executable) ? executable : null;
-  } catch {
-    return null;
-  }
+  core.info(`Cached Codex ${version} for ${target}.`);
+  return findCodexExecutable(cachedPath);
 }
 
-function getCodexTargetTriple(): string | null {
-  if (process.platform === "linux" || process.platform === "android") {
-    if (process.arch === "x64") {
+export function getCodexVersionFromPackageJson(packageJsonText: string): string {
+  const packageJson = JSON.parse(packageJsonText) as {
+    dependencies?: Record<string, unknown>;
+  };
+  const versionRange = packageJson.dependencies?.["@openai/codex-sdk"];
+
+  if (typeof versionRange !== "string") {
+    throw new Error("package.json is missing dependencies.@openai/codex-sdk");
+  }
+
+  const match = versionRange.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/);
+
+  if (!match) {
+    throw new Error(`Could not derive Codex version from @openai/codex-sdk range ${versionRange}`);
+  }
+
+  return match[0];
+}
+
+function getCodexPackageVersion(): string {
+  return getCodexVersionFromPackageJson(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  );
+}
+
+export function getCodexTargetTriple(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): string | null {
+  if (platform === "linux" || platform === "android") {
+    if (arch === "x64") {
       return "x86_64-unknown-linux-musl";
     }
 
-    if (process.arch === "arm64") {
+    if (arch === "arm64") {
       return "aarch64-unknown-linux-musl";
     }
   }
 
-  if (process.platform === "darwin") {
-    if (process.arch === "x64") {
+  if (platform === "darwin") {
+    if (arch === "x64") {
       return "x86_64-apple-darwin";
     }
 
-    if (process.arch === "arm64") {
+    if (arch === "arm64") {
       return "aarch64-apple-darwin";
     }
   }
 
-  if (process.platform === "win32") {
-    if (process.arch === "x64") {
+  if (platform === "win32") {
+    if (arch === "x64") {
       return "x86_64-pc-windows-msvc";
     }
 
-    if (process.arch === "arm64") {
+    if (arch === "arm64") {
       return "aarch64-pc-windows-msvc";
     }
   }
@@ -500,25 +506,79 @@ function getCodexTargetTriple(): string | null {
   return null;
 }
 
-function writeNpxCodexWrapper(codexHome: string): string {
-  const wrapper = path.join(codexHome, process.platform === "win32" ? "codex.cmd" : "codex");
+export function getCodexReleaseAsset(target: string): { assetName: string; format: "tar" | "zip" } {
+  const assets: Record<string, { assetName: string; format: "tar" | "zip" }> = {
+    "aarch64-apple-darwin": {
+      assetName: "codex-aarch64-apple-darwin.tar.gz",
+      format: "tar",
+    },
+    "aarch64-pc-windows-msvc": {
+      assetName: "codex-aarch64-pc-windows-msvc.exe.zip",
+      format: "zip",
+    },
+    "aarch64-unknown-linux-musl": {
+      assetName: "codex-aarch64-unknown-linux-musl.tar.gz",
+      format: "tar",
+    },
+    "x86_64-apple-darwin": {
+      assetName: "codex-x86_64-apple-darwin.tar.gz",
+      format: "tar",
+    },
+    "x86_64-pc-windows-msvc": {
+      assetName: "codex-x86_64-pc-windows-msvc.exe.zip",
+      format: "zip",
+    },
+    "x86_64-unknown-linux-musl": {
+      assetName: "codex-x86_64-unknown-linux-musl.tar.gz",
+      format: "tar",
+    },
+  };
+  const asset = assets[target];
 
-  if (process.platform === "win32") {
-    writeFileSync(
-      wrapper,
-      `@echo off\r\nnpm exec --yes --silent --package @openai/codex@${CODEX_PACKAGE_VERSION} -- codex %*\r\n`,
-      { mode: 0o700 },
-    );
-  } else {
-    writeFileSync(
-      wrapper,
-      `#!/usr/bin/env sh\nexec npm exec --yes --silent --package @openai/codex@${CODEX_PACKAGE_VERSION} -- codex "$@"\n`,
-      { mode: 0o700 },
-    );
+  if (!asset) {
+    throw new Error(`Unsupported Codex release target: ${target}`);
   }
 
-  core.info("Using npx to resolve the Codex CLI because no local native Codex binary was found.");
-  return wrapper;
+  return asset;
+}
+
+export function getCodexReleaseAssetUrl(version: string, target: string): string {
+  const { assetName } = getCodexReleaseAsset(target);
+  return `https://github.com/openai/codex/releases/download/rust-v${version}/${assetName}`;
+}
+
+function findCodexExecutable(directory: string): string {
+  const executable = findFile(directory, process.platform === "win32" ? "codex.exe" : "codex");
+
+  if (!executable) {
+    throw new Error(`Downloaded Codex archive did not contain a codex executable in ${directory}`);
+  }
+
+  if (process.platform !== "win32") {
+    chmodSync(executable, 0o755);
+  }
+
+  return executable;
+}
+
+function findFile(directory: string, fileName: string): string | null {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+
+    if (entry.isFile() && entry.name === fileName) {
+      return entryPath;
+    }
+
+    if (entry.isDirectory()) {
+      const found = findFile(entryPath, fileName);
+
+      if (found) {
+        return found;
+      }
+    }
+  }
+
+  return null;
 }
 
 function createCodexEnv(codexHome: string): Record<string, string> {
@@ -924,30 +984,12 @@ async function runCapturedProcess(
   args: string[],
   options: ProcessOptions = {},
 ): Promise<{ stdout: string; stderr: string }> {
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
-    child.on("error", reject);
-    child.on("close", (code, signal) => {
-      const stdoutText = Buffer.concat(stdout).toString("utf8");
-      const stderrText = Buffer.concat(stderr).toString("utf8");
-
-      if (code !== 0 || signal) {
-        reject(new Error(`${command} failed with ${signal ?? `code ${code ?? 1}`}: ${stderrText}`));
-        return;
-      }
-
-      resolve({ stdout: stdoutText, stderr: stderrText });
-    });
+  const output = await exec.getExecOutput(command, args, {
+    ...options,
+    silent: options.silent ?? true,
   });
+
+  return { stdout: output.stdout, stderr: output.stderr };
 }
 
 async function runInheritedProcess(
@@ -955,23 +997,7 @@ async function runInheritedProcess(
   args: string[],
   options: ProcessOptions = {},
 ): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: "inherit",
-    });
-
-    child.on("error", reject);
-    child.on("close", (code, signal) => {
-      if (code !== 0 || signal) {
-        reject(new Error(`${command} failed with ${signal ?? `code ${code ?? 1}`}`));
-        return;
-      }
-
-      resolve();
-    });
-  });
+  await exec.exec(command, args, options);
 }
 
 function errorMessage(error: unknown): string {

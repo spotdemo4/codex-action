@@ -8,6 +8,10 @@ import {
   decryptText,
   detectPlatform,
   encryptText,
+  getCodexReleaseAsset,
+  getCodexReleaseAssetUrl,
+  getCodexTargetTriple,
+  getCodexVersionFromPackageJson,
   parseOptionalBoolean,
   resolvePromptInput,
   validateRedisUrl,
@@ -46,4 +50,35 @@ await test("detects action platform", () => {
   assert.equal(detectPlatform({}), "github");
   assert.equal(detectPlatform({ GITEA_ACTIONS: "true" }), "gitea");
   assert.equal(detectPlatform({ FORGEJO_ACTIONS: "true" }), "forgejo");
+});
+
+await test("derives Codex version from package.json", () => {
+  assert.equal(
+    getCodexVersionFromPackageJson(
+      JSON.stringify({ dependencies: { "@openai/codex-sdk": "^0.143.0" } }),
+    ),
+    "0.143.0",
+  );
+  assert.equal(
+    getCodexVersionFromPackageJson(
+      JSON.stringify({ dependencies: { "@openai/codex-sdk": "~0.144.0-alpha.2" } }),
+    ),
+    "0.144.0-alpha.2",
+  );
+});
+
+await test("maps platforms to Codex release assets", () => {
+  assert.equal(getCodexTargetTriple("linux", "x64"), "x86_64-unknown-linux-musl");
+  assert.deepEqual(getCodexReleaseAsset("x86_64-unknown-linux-musl"), {
+    assetName: "codex-x86_64-unknown-linux-musl.tar.gz",
+    format: "tar",
+  });
+  assert.deepEqual(getCodexReleaseAsset("x86_64-pc-windows-msvc"), {
+    assetName: "codex-x86_64-pc-windows-msvc.exe.zip",
+    format: "zip",
+  });
+  assert.equal(
+    getCodexReleaseAssetUrl("0.143.0", "aarch64-apple-darwin"),
+    "https://github.com/openai/codex/releases/download/rust-v0.143.0/codex-aarch64-apple-darwin.tar.gz",
+  );
 });
