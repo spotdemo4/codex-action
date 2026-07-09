@@ -54,8 +54,9 @@ token used by the action. This lets Codex inspect pull request comments, issues,
 repository data, and workflow context through MCP tools instead of relying on
 pre-generated prompt text.
 
-No container runtime is required. The action downloads and caches the matching
-release binary with `@actions/tool-cache`:
+No container runtime is required. The action downloads the matching release
+binary and caches it in both the runner tool cache and, when available, the
+Actions cache service:
 
 - `github-mcp-server` from `github/github-mcp-server` on GitHub, with the
   `repos`, `issues`, `pull_requests`, and `actions` toolsets in read-only mode.
@@ -66,6 +67,9 @@ release binary with `@actions/tool-cache`:
 The API token is forwarded through environment variables and is not written to
 Codex MCP configuration. On GitHub App setups, the installation must include the
 Actions read permission so Codex can inspect workflow context.
+
+Set `CODEX_PATH` to a preinstalled Codex executable to skip the Codex binary
+download and cache lookup entirely.
 
 ### Prompt File
 

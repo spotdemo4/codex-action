@@ -44,6 +44,7 @@ import {
   isGitHubAppInstallationUserError,
   normalizePrivateKey,
 } from "../src/platforms/index.ts";
+import { getToolArchiveCacheKey, getToolArchiveCachePaths } from "../src/tool-archive.ts";
 
 await test("validates auth secret names", () => {
   assert.equal(validateSecretName("CODEX_ACTION_AUTH"), "CODEX_ACTION_AUTH");
@@ -425,6 +426,27 @@ await test("maps platforms to Codex release assets", () => {
     getCodexReleaseAssetUrl("0.143.0", "aarch64-apple-darwin"),
     "https://github.com/openai/codex/releases/download/rust-v0.143.0/codex-aarch64-apple-darwin.tar.gz",
   );
+});
+
+await test("builds exact tool archive action cache keys and paths", () => {
+  const asset = {
+    cacheName: "codex",
+    displayName: "Codex",
+    executableNames: ["codex"],
+    version: "0.143.0",
+    target: "x86_64-unknown-linux-musl",
+    assetName: "codex-x86_64-unknown-linux-musl.tar.gz",
+    format: "tar" as const,
+  };
+
+  assert.equal(
+    getToolArchiveCacheKey(asset),
+    "codex-action-tool-cache-v1-codex-0.143.0-x86_64-unknown-linux-musl",
+  );
+  assert.deepEqual(getToolArchiveCachePaths(asset, "/tool-cache/codex/0.143.0/target"), [
+    "/tool-cache/codex/0.143.0/target",
+    "/tool-cache/codex/0.143.0/target.complete",
+  ]);
 });
 
 await test("finds target-named Codex release executables", () => {
