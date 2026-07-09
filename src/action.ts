@@ -78,6 +78,6 @@ export async function run(): Promise<void> {
       }
     }
   } finally {
-    currentAuth = (await persistCodexAuth(codexHome, currentAuth, updateAuthSecret)) ?? currentAuth;
+    await persistCodexAuth(codexHome, currentAuth, updateAuthSecret);
   }
 }

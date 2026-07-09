@@ -25,7 +25,7 @@ export type PlatformMcp = {
 };
 
 export type ActionInputs = {
-  auth: string;
+  auth: string | undefined;
   authSecret: string;
   prompt: string;
   model: string | undefined;

@@ -7,13 +7,8 @@ export function logCodexText(title: string, text: string): void {
   core.endGroup();
 }
 
-export type CodexStreamResult = {
-  items: ThreadItem[];
+type CodexStreamState = {
   finalResponse: string;
-  usage: Usage | null;
-};
-
-type CodexStreamState = CodexStreamResult & {
   textByItemId: Map<string, string>;
   commandOutputByItemId: Map<string, string>;
   todoSummaryByItemId: Map<string, string>;
@@ -39,13 +34,9 @@ const CODEX_LOG_LABEL_COLORS: Record<string, string> = {
   error: "\x1b[31m",
 };
 
-export async function logCodexStream(
-  events: AsyncGenerator<ThreadEvent>,
-): Promise<CodexStreamResult> {
+export async function logCodexStream(events: AsyncGenerator<ThreadEvent>): Promise<string> {
   const state: CodexStreamState = {
-    items: [],
     finalResponse: "",
-    usage: null,
     textByItemId: new Map(),
     commandOutputByItemId: new Map(),
     todoSummaryByItemId: new Map(),
@@ -60,7 +51,6 @@ export async function logCodexStream(
         logCodexLine("turn", "started");
         break;
       case "turn.completed":
-        state.usage = event.usage;
         logCodexLine("turn", `completed; ${formatCodexUsage(event.usage)}`);
         break;
       case "turn.failed":
@@ -80,17 +70,12 @@ export async function logCodexStream(
           state.finalResponse = event.item.text;
         }
 
-        state.items.push(event.item);
         logCodexItem("completed", event.item, state);
         break;
     }
   }
 
-  return {
-    items: state.items,
-    finalResponse: state.finalResponse,
-    usage: state.usage,
-  };
+  return state.finalResponse;
 }
 
 function logCodexItem(phase: CodexItemPhase, item: ThreadItem, state: CodexStreamState): void {

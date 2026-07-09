@@ -8,7 +8,7 @@ import type { ActionInputs } from "./types.ts";
 const DEFAULT_AUTH_SECRET = "CODEX_ACTION_AUTH";
 
 export function readInputs(): ActionInputs {
-  const auth = core.getInput("auth");
+  const auth = parseOptionalString(core.getInput("auth"));
   const authSecret = validateSecretName(core.getInput("auth-secret") || DEFAULT_AUTH_SECRET);
   const prompt = core.getInput("prompt", { required: true });
   const model = parseOptionalString(core.getInput("model"));

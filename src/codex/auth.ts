@@ -11,7 +11,7 @@ import { createCodexEnv } from "./env.ts";
 const CODEX_AUTH_REFRESH_SKEW_MS = 10 * 60 * 1000;
 
 export async function ensureCodexAuth(
-  auth: string,
+  auth: string | undefined,
   codexHome: string,
   codexExecutable: string,
   workspace: string,
@@ -63,7 +63,7 @@ export async function ensureCodexAuth(
 
 export async function persistCodexAuth(
   codexHome: string,
-  previousAuth: string,
+  previousAuth: string | undefined,
   updateAuthSecret: (value: string) => Promise<void>,
   options: { required?: boolean } = {},
 ): Promise<string | undefined> {
@@ -267,7 +267,7 @@ function validateCodexAuthJson(authJson: string): void {
   }
 }
 
-function getPreviousAuthJson(auth: string): string | undefined {
+function getPreviousAuthJson(auth: string | undefined): string | undefined {
   if (!auth) {
     return undefined;
   }

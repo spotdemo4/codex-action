@@ -31,7 +31,7 @@ export async function runCodexPrompt(
   const { events } = await thread.runStreamed(codexPrompt, {
     outputSchema: CODEX_OUTPUT_SCHEMA,
   });
-  const turn = await logCodexStream(events);
+  const finalResponse = await logCodexStream(events);
 
-  return parseCodexMetadata(turn.finalResponse);
+  return parseCodexMetadata(finalResponse);
 }
