@@ -39,6 +39,6 @@ jobs:
         uses: ./. # zizmor: ignore[unpinned-uses]
         with:
           auth: ${{ secrets.CODEX_ACTION_AUTH }}
-          token: ${{ secrets.CODEX_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           model: gpt-5.3-codex-spark
           prompt: Hello
