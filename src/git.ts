@@ -1,25 +1,25 @@
 import * as core from "@actions/core";
+import * as exec from "@actions/exec";
 import * as github from "@actions/github";
 
-import { runCapturedProcess } from "./process.ts";
 import type { ActionUser, Platform, PullRequestPayload } from "./types.ts";
 
 export async function configureGitUser(workspace: string, user: ActionUser): Promise<void> {
-  await runCapturedProcess("git", ["config", "user.name", user.login], { cwd: workspace });
-  await runCapturedProcess("git", ["config", "user.email", user.email], { cwd: workspace });
+  await runGit(["config", "user.name", user.login], workspace);
+  await runGit(["config", "user.email", user.email], workspace);
   core.info(`Configured git user as ${user.login} <${user.email}>.`);
 }
 
 export async function hasGitChanges(workspace: string): Promise<boolean> {
-  const { stdout } = await runCapturedProcess("git", ["status", "--porcelain"], { cwd: workspace });
+  const { stdout } = await runGit(["status", "--porcelain"], workspace);
   return stdout.trim().length > 0;
 }
 
 export async function commitChanges(workspace: string, commitMessage: string): Promise<void> {
   const message = commitMessage || "Update with Codex";
 
-  await runCapturedProcess("git", ["add", "-A"], { cwd: workspace });
-  await runCapturedProcess("git", ["commit", "-m", message], { cwd: workspace });
+  await runGit(["add", "-A"], workspace);
+  await runGit(["commit", "-m", message], workspace);
   core.info("Committed Codex changes.");
 }
 
@@ -31,7 +31,7 @@ export async function pushChanges(
 ): Promise<void> {
   await withAuthenticatedOrigin(workspace, platform, user, token, async () => {
     const pushRef = await resolvePushRef(workspace);
-    await runCapturedProcess("git", ["push", "origin", `HEAD:${pushRef}`], { cwd: workspace });
+    await runGit(["push", "origin", `HEAD:${pushRef}`], workspace);
   });
   core.info("Pushed Codex changes.");
 }
@@ -48,9 +48,7 @@ async function resolvePushRef(workspace: string): Promise<string> {
     return process.env.GITHUB_REF_NAME;
   }
 
-  const { stdout } = await runCapturedProcess("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-    cwd: workspace,
-  });
+  const { stdout } = await runGit(["rev-parse", "--abbrev-ref", "HEAD"], workspace);
   const branch = stdout.trim();
 
   if (!branch || branch === "HEAD") {
@@ -67,9 +65,7 @@ async function withAuthenticatedOrigin(
   token: string,
   callback: () => Promise<void>,
 ): Promise<void> {
-  const { stdout } = await runCapturedProcess("git", ["remote", "get-url", "origin"], {
-    cwd: workspace,
-  });
+  const { stdout } = await runGit(["remote", "get-url", "origin"], workspace);
   const originalUrl = stdout.trim();
   const authenticatedUrl = buildAuthenticatedRemoteUrl(originalUrl, platform, user, token);
 
@@ -79,17 +75,17 @@ async function withAuthenticatedOrigin(
   }
 
   core.setSecret(authenticatedUrl);
-  await runCapturedProcess("git", ["remote", "set-url", "origin", authenticatedUrl], {
-    cwd: workspace,
-  });
+  await runGit(["remote", "set-url", "origin", authenticatedUrl], workspace);
 
   try {
     await callback();
   } finally {
-    await runCapturedProcess("git", ["remote", "set-url", "origin", originalUrl], {
-      cwd: workspace,
-    });
+    await runGit(["remote", "set-url", "origin", originalUrl], workspace);
   }
+}
+
+async function runGit(args: string[], workspace: string): Promise<exec.ExecOutput> {
+  return exec.getExecOutput("git", args, { cwd: workspace, silent: true });
 }
 
 function buildAuthenticatedRemoteUrl(

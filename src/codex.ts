@@ -13,10 +13,10 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 
 import * as core from "@actions/core";
+import * as exec from "@actions/exec";
 import { Codex, type ThreadEvent, type ThreadItem, type Usage } from "@openai/codex-sdk";
 
 import { isPullRequestEvent } from "./platforms/index.ts";
-import { runInheritedProcess } from "./process.ts";
 import type { CodexRunMetadata } from "./types.ts";
 import { errorMessage } from "./utils.ts";
 
@@ -280,7 +280,7 @@ async function runCodexDeviceLogin(
   workspace: string,
 ): Promise<void> {
   core.info("Starting Codex device authorization. Complete the browser flow shown below.");
-  await runInheritedProcess(codexExecutable, ["login", "--device-auth"], {
+  await exec.exec(codexExecutable, ["login", "--device-auth"], {
     cwd: workspace,
     env: createCodexEnv(codexHome),
   });
