@@ -1,8 +1,10 @@
 import * as core from "@actions/core";
 
+import { getDefaultCodexModel } from "./codex/app-server.ts";
 import { ensureCodexAuth, persistCodexAuth } from "./codex/auth.ts";
 import { resolveCodexExecutable } from "./codex/binary.ts";
 import { createCodexHome } from "./codex/home.ts";
+import { formatCodexPullRequestComment } from "./codex/prompt.ts";
 import { runCodexPrompt } from "./codex/runner.ts";
 import { commitChanges, configureGitUser, hasGitChanges, pushChanges } from "./git.ts";
 import { readInputs, resolvePromptInput } from "./inputs.ts";
@@ -35,19 +37,24 @@ export async function run(): Promise<void> {
 
     const user = await platformClient.getActionUser();
     await configureGitUser(workspace, user);
-    const codexEnv = await setupCodexMcp(codexHome, platformClient);
 
+    const pullRequestEvent = isPullRequestEvent();
+    const model =
+      inputs.model ??
+      (pullRequestEvent
+        ? await getDefaultCodexModel(codexExecutable, codexHome, workspace)
+        : undefined);
+    const codexEnv = await setupCodexMcp(codexHome, platformClient);
     const prompt = resolvePromptInput(inputs.prompt, workspace);
     const metadata = await runCodexPrompt(
       codexExecutable,
       codexHome,
       workspace,
       prompt,
-      inputs.model,
+      model,
       codexEnv,
     );
 
-    const pullRequestEvent = isPullRequestEvent();
     const prComment = metadata.prComment.trim();
 
     if (await hasGitChanges(workspace)) {
@@ -63,10 +70,16 @@ export async function run(): Promise<void> {
     }
 
     if (pullRequestEvent && prComment) {
+      if (!model) {
+        throw new Error("Could not determine the Codex model for the pull request comment");
+      }
+
       if (inputs.dryRun) {
         core.info("Dry run enabled; skipping Codex pull request comment");
       } else {
-        await platformClient.postPullRequestComment(prComment);
+        await platformClient.postPullRequestComment(
+          formatCodexPullRequestComment(prComment, model),
+        );
       }
     }
 

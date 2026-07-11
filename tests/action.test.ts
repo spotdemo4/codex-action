@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import { parseDefaultCodexModel } from "../src/codex/app-server.ts";
 import {
   codexAuthNeedsRefresh,
   decodeAuthSecret,
@@ -20,6 +21,7 @@ import {
   getCodexExecutableNames,
   getCodexTargetTriple,
 } from "../src/codex/binary.ts";
+import { formatCodexPullRequestComment } from "../src/codex/prompt.ts";
 import { buildAuthenticatedRemoteUrl, buildCredentialIsolationGitArgs } from "../src/git.ts";
 import {
   parseOptionalBoolean,
@@ -64,6 +66,27 @@ await test("parses optional boolean inputs", () => {
 await test("parses optional string inputs", () => {
   assert.equal(parseOptionalString(""), undefined);
   assert.equal(parseOptionalString("  gpt-5.1-codex-max  "), "gpt-5.1-codex-max");
+});
+
+await test("finds the default Codex model", () => {
+  assert.equal(
+    parseDefaultCodexModel({
+      data: [
+        { model: "gpt-5.3-codex", isDefault: false },
+        { model: "gpt-5.4", isDefault: true },
+      ],
+    }),
+    "gpt-5.4",
+  );
+  assert.throws(() => parseDefaultCodexModel({ data: [] }), /default model/);
+  assert.throws(() => parseDefaultCodexModel(null), /not an object/);
+});
+
+await test("formats Codex pull request comment metadata", () => {
+  assert.equal(
+    formatCodexPullRequestComment("Review complete.  ", "gpt<5>&\"'"),
+    "Review complete.\n\n---\n<sub>Agent: Codex | Model: <code>gpt&lt;5&gt;&amp;&quot;&#39;</code></sub>",
+  );
 });
 
 await test("validates action authentication inputs", () => {

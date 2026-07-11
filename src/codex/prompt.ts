@@ -46,3 +46,16 @@ export function parseCodexMetadata(response: string): CodexRunMetadata {
     prComment: typeof parsed.pr_comment === "string" ? parsed.pr_comment.trim() : "",
   };
 }
+
+export function formatCodexPullRequestComment(comment: string, model: string): string {
+  return `${comment.trim()}\n\n---\n<sub>Agent: Codex | Model: <code>${escapeHtml(model)}</code></sub>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}

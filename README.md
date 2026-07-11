@@ -114,7 +114,9 @@ configured MCP server can access the platform API with the action token.
 ### Pull Requests
 
 On pull request events, Codex can leave a PR comment and optionally toggle
-automerge.
+automerge. Non-empty comments include a footer identifying Codex and the model
+used for the run. When `model` is omitted, the action resolves and uses Codex's
+current default model.
 
 ```yaml
 name: codex-pr

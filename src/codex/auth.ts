@@ -5,7 +5,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 
 import { errorMessage } from "../utils.ts";
-import { startCodexAppServer } from "./app-server.ts";
+import { initializeCodexAppServer, startCodexAppServer } from "./app-server.ts";
 import { createCodexEnv } from "./env.ts";
 
 const CODEX_AUTH_REFRESH_SKEW_MS = 10 * 60 * 1000;
@@ -231,14 +231,7 @@ async function refreshCodexAuth(
   const appServer = startCodexAppServer(codexExecutable, codexHome, workspace);
 
   try {
-    await appServer.request(0, "initialize", {
-      clientInfo: {
-        name: "codex-action",
-        title: "codex-action",
-        version: "0.0.1",
-      },
-    });
-    appServer.notify("initialized", {});
+    await initializeCodexAppServer(appServer);
     const result = await appServer.request(1, "account/read", { refreshToken: true });
 
     if (!isCodexAccountReadAuthenticated(result)) {

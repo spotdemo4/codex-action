@@ -21,6 +21,62 @@ export type CodexAppServer = {
   close(): Promise<void>;
 };
 
+export async function initializeCodexAppServer(appServer: CodexAppServer): Promise<void> {
+  await appServer.request(0, "initialize", {
+    clientInfo: {
+      name: "codex-action",
+      title: "codex-action",
+      version: "0.0.1",
+    },
+  });
+  appServer.notify("initialized", {});
+}
+
+export async function getDefaultCodexModel(
+  codexExecutable: string,
+  codexHome: string,
+  workspace: string,
+): Promise<string> {
+  const appServer = startCodexAppServer(codexExecutable, codexHome, workspace);
+
+  try {
+    await initializeCodexAppServer(appServer);
+    const result = await appServer.request(1, "model/list", {
+      limit: 100,
+      includeHidden: true,
+    });
+    return parseDefaultCodexModel(result);
+  } finally {
+    await appServer.close();
+  }
+}
+
+export function parseDefaultCodexModel(result: unknown): string {
+  if (result === null || typeof result !== "object" || Array.isArray(result)) {
+    throw new Error("Codex model/list response was not an object");
+  }
+
+  const data = (result as { data?: unknown }).data;
+
+  if (!Array.isArray(data)) {
+    throw new Error("Codex model/list response did not include model data");
+  }
+
+  for (const entry of data) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      continue;
+    }
+
+    const model = entry as { isDefault?: unknown; model?: unknown };
+
+    if (model.isDefault === true && typeof model.model === "string" && model.model.trim()) {
+      return model.model.trim();
+    }
+  }
+
+  throw new Error("Codex model/list response did not include a default model");
+}
+
 export function startCodexAppServer(
   codexExecutable: string,
   codexHome: string,
