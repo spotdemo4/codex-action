@@ -1,6 +1,6 @@
 {
   "name": "codex-action",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "use codex in a GitHub/Gitea/Forgejo action",
   "license": "MIT",
   "repository": {
