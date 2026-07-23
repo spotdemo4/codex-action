@@ -11,7 +11,7 @@ import type {
 import { errorMessage } from "../utils.ts";
 import { getPullRequestNumber, getServerUrl } from "./context.ts";
 
-const FORGEJO_MCP_VERSION = "2.30.1";
+const FORGEJO_MCP_VERSION = "2.30.2";
 
 class HttpError extends Error {
   status: number;
