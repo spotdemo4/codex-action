@@ -36,18 +36,20 @@
             packages = with pkgs; [
               # node
               nodejs_24
-
-              # lint
               oxlint
-              nixd
-              nil
+              typescript-go
 
-              # format
-              oxfmt
+              vscode-json-languageserver # json
+              yaml-language-server # yaml
+              tombi # toml
+              oxfmt # format
+
+              # nix
+              nixd
               nixfmt
-              treefmt
 
               # util
+              treefmt
               bumper
             ];
           };
