@@ -353,9 +353,10 @@ await test("builds Gitea MCP config without embedding the token", () => {
 });
 
 await test("maps platforms to GitHub MCP release assets", () => {
-  assert.deepEqual(getMcpReleaseAsset("github", "linux", "x64"), {
+  const { version, ...asset } = getMcpReleaseAsset("github", "linux", "x64");
+
+  assert.deepEqual(asset, {
     cacheName: "github-mcp-server",
-    version: "1.5.0",
     target: "Linux-x86_64",
     assetName: "github-mcp-server_Linux_x86_64.tar.gz",
     format: "tar",
@@ -364,14 +365,15 @@ await test("maps platforms to GitHub MCP release assets", () => {
 
   assert.equal(
     getMcpReleaseAssetUrl("github", "win32", "arm64"),
-    "https://github.com/github/github-mcp-server/releases/download/v1.5.0/github-mcp-server_Windows_arm64.zip",
+    `https://github.com/github/github-mcp-server/releases/download/v${version}/github-mcp-server_Windows_arm64.zip`,
   );
 });
 
 await test("maps platforms to Gitea MCP release assets", () => {
-  assert.deepEqual(getMcpReleaseAsset("gitea", "linux", "x64"), {
+  const { version, ...asset } = getMcpReleaseAsset("gitea", "linux", "x64");
+
+  assert.deepEqual(asset, {
     cacheName: "gitea-mcp",
-    version: "1.3.0",
     target: "Linux-x86_64",
     assetName: "gitea-mcp_Linux_x86_64.tar.gz",
     format: "tar",
@@ -380,23 +382,24 @@ await test("maps platforms to Gitea MCP release assets", () => {
 
   assert.equal(
     getMcpReleaseAssetUrl("gitea", "win32", "arm64"),
-    "https://gitea.com/gitea/gitea-mcp/releases/download/v1.3.0/gitea-mcp_Windows_arm64.zip",
+    `https://gitea.com/gitea/gitea-mcp/releases/download/v${version}/gitea-mcp_Windows_arm64.zip`,
   );
 });
 
 await test("maps platforms to Forgejo MCP release assets", () => {
-  assert.deepEqual(getMcpReleaseAsset("forgejo", "darwin", "arm64"), {
+  const { version, ...asset } = getMcpReleaseAsset("forgejo", "darwin", "arm64");
+
+  assert.deepEqual(asset, {
     cacheName: "forgejo-mcp",
-    version: "2.30.1",
     target: "darwin-arm64",
-    assetName: "forgejo-mcp_2.30.1_darwin_arm64.tar.gz",
+    assetName: `forgejo-mcp_${version}_darwin_arm64.tar.gz`,
     format: "tar",
     executableNames: ["forgejo-mcp"],
   });
 
   assert.equal(
     getMcpReleaseAssetUrl("forgejo", "linux", "x64"),
-    "https://codeberg.org/goern/forgejo-mcp/releases/download/v2.30.1/forgejo-mcp_2.30.1_linux_amd64.tar.gz",
+    `https://codeberg.org/goern/forgejo-mcp/releases/download/v${version}/forgejo-mcp_${version}_linux_amd64.tar.gz`,
   );
   assert.throws(() => getMcpReleaseAsset("forgejo", "win32", "x64"), /Unsupported Forgejo/);
 });

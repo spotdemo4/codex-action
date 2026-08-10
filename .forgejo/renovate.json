@@ -7,7 +7,7 @@
   "platform": "forgejo",
   "endpoint": "https://trev.zip/api/v1",
   "repositories": ["llc/codex-action"],
-  "allowedCommands": ["npm audit fix", "npm run build"],
+  "allowedCommands": ["^npm audit fix$", "^npm ci --ignore-scripts$", "^npm run build$"],
 
   // repository
   "extends": ["config:recommended"],
@@ -89,7 +89,7 @@
         "goern/forgejo-mcp"
       ],
       "postUpgradeTasks": {
-        "commands": ["npm run build"],
+        "commands": ["npm ci --ignore-scripts", "npm run build"],
         "fileFilters": ["build/index.js"]
       }
     },
