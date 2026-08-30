@@ -26,11 +26,10 @@ jobs:
           set -euo pipefail
           server_host="${SERVER_URL#https://}"
           server_host="${server_host#http://}"
-          fj --host "${server_host}" auth add-key "${FORGEJO_USER}" "${FORGEJO_TOKEN}"
+          fj --host "${server_host}" auth add-token "${FORGEJO_TOKEN}"
           fj --host "${server_host}" release create "${TAG}" --repo "${REPOSITORY}" --tag "${TAG}"
         env:
           FORGEJO_TOKEN: ${{ secrets.DOCTOR_TOKEN }}
-          FORGEJO_USER: ${{ github.actor }}
           REPOSITORY: ${{ github.repository }}
           SERVER_URL: ${{ forgejo.SERVER_URL }}
           TAG: ${{ github.ref_name }}
