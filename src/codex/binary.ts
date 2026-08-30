@@ -1,3 +1,6 @@
+import { chmodSync, existsSync, statSync } from "node:fs";
+import path from "node:path";
+
 import {
   findArchiveExecutable,
   resolveCachedExecutable,
@@ -63,39 +66,23 @@ export function getCodexTargetTriple(
 }
 
 export function getCodexReleaseAsset(target: string): { assetName: string; format: "tar" | "zip" } {
-  const assets: Record<string, { assetName: string; format: "tar" | "zip" }> = {
-    "aarch64-apple-darwin": {
-      assetName: "codex-aarch64-apple-darwin.tar.gz",
-      format: "tar",
-    },
-    "aarch64-pc-windows-msvc": {
-      assetName: "codex-aarch64-pc-windows-msvc.exe.zip",
-      format: "zip",
-    },
-    "aarch64-unknown-linux-musl": {
-      assetName: "codex-aarch64-unknown-linux-musl.tar.gz",
-      format: "tar",
-    },
-    "x86_64-apple-darwin": {
-      assetName: "codex-x86_64-apple-darwin.tar.gz",
-      format: "tar",
-    },
-    "x86_64-pc-windows-msvc": {
-      assetName: "codex-x86_64-pc-windows-msvc.exe.zip",
-      format: "zip",
-    },
-    "x86_64-unknown-linux-musl": {
-      assetName: "codex-x86_64-unknown-linux-musl.tar.gz",
-      format: "tar",
-    },
-  };
-  const asset = assets[target];
+  const supportedTargets = new Set([
+    "aarch64-apple-darwin",
+    "aarch64-pc-windows-msvc",
+    "aarch64-unknown-linux-musl",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-musl",
+  ]);
 
-  if (!asset) {
+  if (!supportedTargets.has(target)) {
     throw new Error(`Unsupported Codex release target: ${target}`);
   }
 
-  return asset;
+  return {
+    assetName: `codex-package-${target}.tar.gz`,
+    format: "tar",
+  };
 }
 
 export function getCodexReleaseAssetUrl(version: string, target: string): string {
@@ -118,7 +105,7 @@ export function getCodexExecutableNames(
   return platform === "win32" ? ["codex.exe", `codex-${target}.exe`] : ["codex", `codex-${target}`];
 }
 
-function getCodexToolArchiveAsset(version: string, target: string): ToolArchiveAsset {
+export function getCodexToolArchiveAsset(version: string, target: string): ToolArchiveAsset {
   return {
     ...getCodexExecutableSpec(target),
     ...getCodexReleaseAsset(target),
@@ -132,8 +119,25 @@ function getCodexExecutableSpec(
   platform: NodeJS.Platform = process.platform,
 ): ToolArchiveExecutableSpec {
   return {
-    cacheName: "codex",
+    cacheName: "codex-package",
     displayName: "Codex",
     executableNames: getCodexExecutableNames(target, platform),
+    validateExecutable: validateCodexPackage,
   };
+}
+
+function validateCodexPackage(
+  executable: string,
+  platform: NodeJS.Platform = process.platform,
+): void {
+  const hostName = platform === "win32" ? "codex-code-mode-host.exe" : "codex-code-mode-host";
+  const host = path.join(path.dirname(executable), hostName);
+
+  if (!existsSync(host) || !statSync(host).isFile()) {
+    throw new Error(`Downloaded Codex package did not contain ${hostName} next to ${executable}`);
+  }
+
+  if (platform !== "win32") {
+    chmodSync(host, 0o755);
+  }
 }

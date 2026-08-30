@@ -20,6 +20,7 @@ import {
   getCodexReleaseAssetUrl,
   getCodexExecutableNames,
   getCodexTargetTriple,
+  getCodexToolArchiveAsset,
 } from "../src/codex/binary.ts";
 import { formatCodexPullRequestComment } from "../src/codex/prompt.ts";
 import { buildAuthenticatedRemoteUrl, buildCredentialIsolationGitArgs } from "../src/git.ts";
@@ -441,52 +442,65 @@ await test("creates GitHub App JWTs", () => {
 await test("maps platforms to Codex release assets", () => {
   assert.equal(getCodexTargetTriple("linux", "x64"), "x86_64-unknown-linux-musl");
   assert.deepEqual(getCodexReleaseAsset("x86_64-unknown-linux-musl"), {
-    assetName: "codex-x86_64-unknown-linux-musl.tar.gz",
+    assetName: "codex-package-x86_64-unknown-linux-musl.tar.gz",
     format: "tar",
   });
   assert.deepEqual(getCodexReleaseAsset("x86_64-pc-windows-msvc"), {
-    assetName: "codex-x86_64-pc-windows-msvc.exe.zip",
-    format: "zip",
+    assetName: "codex-package-x86_64-pc-windows-msvc.tar.gz",
+    format: "tar",
   });
   assert.equal(
-    getCodexReleaseAssetUrl("0.143.0", "aarch64-apple-darwin"),
-    "https://github.com/openai/codex/releases/download/rust-v0.143.0/codex-aarch64-apple-darwin.tar.gz",
+    getCodexReleaseAssetUrl("0.150.1", "aarch64-apple-darwin"),
+    "https://github.com/openai/codex/releases/download/rust-v0.150.1/codex-package-aarch64-apple-darwin.tar.gz",
   );
 });
 
 await test("builds exact tool archive action cache keys and paths", () => {
-  const asset = {
-    cacheName: "codex",
-    displayName: "Codex",
-    executableNames: ["codex"],
-    version: "0.143.0",
-    target: "x86_64-unknown-linux-musl",
-    assetName: "codex-x86_64-unknown-linux-musl.tar.gz",
-    format: "tar" as const,
-  };
+  const asset = getCodexToolArchiveAsset("0.150.1", "x86_64-unknown-linux-musl");
 
   assert.equal(
     getToolArchiveCacheKey(asset),
-    "codex-action-tool-cache-v1-codex-0.143.0-x86_64-unknown-linux-musl",
+    "codex-action-tool-cache-v1-codex-package-0.150.1-x86_64-unknown-linux-musl",
   );
-  assert.deepEqual(getToolArchiveCachePaths(asset, "/tool-cache/codex/0.143.0/target"), [
-    "/tool-cache/codex/0.143.0/target",
-    "/tool-cache/codex/0.143.0/target.complete",
+  assert.deepEqual(getToolArchiveCachePaths(asset, "/tool-cache/codex-package/0.150.1/target"), [
+    "/tool-cache/codex-package/0.150.1/target",
+    "/tool-cache/codex-package/0.150.1/target.complete",
   ]);
 });
 
-await test("finds target-named Codex release executables", () => {
+await test("finds complete Codex package executables", () => {
   const directory = mkdtempSync(path.join(tmpdir(), "codex-action-test-"));
-  const nestedDirectory = path.join(directory, "nested");
-  const executable = path.join(nestedDirectory, "codex-x86_64-unknown-linux-musl");
-  mkdirSync(nestedDirectory);
+  const binDirectory = path.join(directory, "bin");
+  const executable = path.join(binDirectory, "codex");
+  mkdirSync(binDirectory);
   writeFileSync(executable, "#!/bin/sh\n");
 
   assert.deepEqual(getCodexExecutableNames("x86_64-unknown-linux-musl", "linux"), [
     "codex",
     "codex-x86_64-unknown-linux-musl",
   ]);
+  assert.throws(
+    () => findCodexExecutable(directory, "x86_64-unknown-linux-musl", "linux"),
+    /did not contain codex-code-mode-host/,
+  );
+
+  writeFileSync(path.join(binDirectory, "codex-code-mode-host"), "#!/bin/sh\n");
   assert.equal(findCodexExecutable(directory, "x86_64-unknown-linux-musl", "linux"), executable);
+});
+
+await test("finds complete Windows Codex package executables", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "codex-action-test-"));
+  const binDirectory = path.join(directory, "bin");
+  const executable = path.join(binDirectory, "codex.exe");
+  mkdirSync(binDirectory);
+  writeFileSync(executable, "");
+  writeFileSync(path.join(binDirectory, "codex-code-mode-host.exe"), "");
+
+  assert.deepEqual(getCodexExecutableNames("x86_64-pc-windows-msvc", "win32"), [
+    "codex.exe",
+    "codex-x86_64-pc-windows-msvc.exe",
+  ]);
+  assert.equal(findCodexExecutable(directory, "x86_64-pc-windows-msvc", "win32"), executable);
 });
 
 function createJwt(exp: number): string {

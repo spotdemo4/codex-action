@@ -9,6 +9,7 @@ export type ToolArchiveExecutableSpec = {
   cacheName: string;
   displayName?: string;
   executableNames: string[];
+  validateExecutable?: (executable: string, platform: NodeJS.Platform) => void;
 };
 
 export type ToolArchiveAsset = ToolArchiveExecutableSpec & {
@@ -74,6 +75,7 @@ export function findArchiveExecutable(
     chmodSync(executable, 0o755);
   }
 
+  spec.validateExecutable?.(executable, platform);
   return executable;
 }
 
