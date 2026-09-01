@@ -20,7 +20,7 @@
       "customType": "regex",
       "description": "Update Codex CLI release version",
       "managerFilePatterns": ["/^src/codex/binary\\.ts$/"],
-      "matchStrings": ["const CODEX_VERSION = \"(?<currentValue>[^\"]+)\";"],
+      "matchStrings": ["export const CODEX_VERSION = \"(?<currentValue>[^\"]+)\";"],
       "packageNameTemplate": "openai/codex",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver",

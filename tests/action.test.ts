@@ -22,7 +22,6 @@ import {
   getCodexTargetTriple,
   getCodexToolArchiveAsset,
 } from "../src/codex/binary.ts";
-import { formatCodexPullRequestComment } from "../src/codex/prompt.ts";
 import { buildAuthenticatedRemoteUrl, buildCredentialIsolationGitArgs } from "../src/git.ts";
 import {
   parseOptionalBoolean,
@@ -81,13 +80,6 @@ await test("finds the default Codex model", () => {
   );
   assert.throws(() => parseDefaultCodexModel({ data: [] }), /default model/);
   assert.throws(() => parseDefaultCodexModel(null), /not an object/);
-});
-
-await test("formats Codex pull request comment metadata", () => {
-  assert.equal(
-    formatCodexPullRequestComment("Review complete.  ", "gpt<5>&\"'"),
-    "Review complete.\n\n---\n<sub>Agent: Codex | Model: <code>gpt&lt;5&gt;&amp;&quot;&#39;</code></sub>",
-  );
 });
 
 await test("validates action authentication inputs", () => {

@@ -1,5 +1,6 @@
 import { isPullRequestEvent } from "../platforms/index.ts";
 import type { CodexRunMetadata } from "../types.ts";
+import { CODEX_VERSION } from "./binary.ts";
 
 export const CODEX_OUTPUT_SCHEMA = {
   type: "object",
@@ -48,7 +49,7 @@ export function parseCodexMetadata(response: string): CodexRunMetadata {
 }
 
 export function formatCodexPullRequestComment(comment: string, model: string): string {
-  return `${comment.trim()}\n\n---\n<sub>Agent: Codex | Model: <code>${escapeHtml(model)}</code></sub>`;
+  return `${comment.trim()}\n<sub>agent: codex ${CODEX_VERSION} | model: <code>${escapeHtml(model)}</code></sub>`;
 }
 
 function escapeHtml(value: string): string {
