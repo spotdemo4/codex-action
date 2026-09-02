@@ -8,7 +8,7 @@ import {
   type ToolArchiveExecutableSpec,
 } from "../tool-archive.ts";
 
-export const CODEX_VERSION = "0.152.0";
+export const CODEX_VERSION = "0.152.1";
 
 export async function resolveCodexExecutable(): Promise<string> {
   if (process.env.CODEX_PATH) {
