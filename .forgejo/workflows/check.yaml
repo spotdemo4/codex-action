@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
 
       - name: Run action
-        uses: ./. # zizmor: ignore[unpinned-uses]
+        uses: ./. # zizmor: ignore[self-repository, unpinned-uses]
         with:
           auth: ${{ secrets.CODEX_ACTION_AUTH }}
           token: ${{ secrets.CODEX_TOKEN }}

@@ -36,7 +36,7 @@ jobs:
           persist-credentials: false
 
       - name: Run action
-        uses: ./. # zizmor: ignore[unpinned-uses]
+        uses: $/. # zizmor: ignore[unpinned-uses]
         with:
           auth: ${{ secrets.CODEX_ACTION_AUTH }}
           client-id: ${{ vars.CLIENT_ID }}
