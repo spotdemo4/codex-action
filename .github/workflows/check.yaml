@@ -41,7 +41,7 @@ jobs:
           auth: ${{ secrets.CODEX_ACTION_AUTH }}
           client-id: ${{ vars.CLIENT_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
-          model: gpt-5.3-codex-spark
+          model: gpt-5.6-luna
           dry-run: true
           prompt: |
             Create or update .codex-action-check.txt with a single line saying "codex-action dry-run check".
