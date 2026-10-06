@@ -16,7 +16,7 @@ enable-openid-connect: true
 jobs:
   check:
     # zizmor: ignore[excessive-permissions]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Initialize
         uses: spotdemo4/nix-init@af9aaf53d1ae2230cb82617c563c9427a22a8c15 # v1.66.0
@@ -29,7 +29,7 @@ jobs:
 
   action:
     # zizmor: ignore[excessive-permissions]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
