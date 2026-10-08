@@ -29,7 +29,7 @@
     "@tsconfig/node-ts": "^23.6.4",
     "@tsconfig/node24": "^24.0.5",
     "@types/node": "^24.19.1",
-    "rolldown": "^1.2.12",
+    "rolldown": "^1.2.13",
     "typescript": "^7.0.2"
   },
   "engines": {
