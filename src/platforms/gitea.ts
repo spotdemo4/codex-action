@@ -11,7 +11,7 @@ import type {
 import { errorMessage } from "../utils.ts";
 import { getPullRequestNumber, getServerUrl } from "./context.ts";
 
-const GITEA_MCP_VERSION = "1.8.0";
+const GITEA_MCP_VERSION = "1.8.1";
 
 class HttpError extends Error {
   status: number;
