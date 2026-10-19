@@ -93,7 +93,7 @@
           default = pkgs.buildNpmPackage (
             final: with pkgs.lib; {
               pname = "codex-action";
-              version = "0.5.12";
+              version = "0.5.13";
 
               src = fileset.toSource {
                 root = ./.;
